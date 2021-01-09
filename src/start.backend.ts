@@ -11,6 +11,6 @@ export async function run(args: string[]) {
     await ins.record(args.shift(), args.join(' '))
   }
   if (command === 'replay') {
-    ins.replay(args.join(' '))
+    await ins.replay(args.join(' '))
   }
 }
