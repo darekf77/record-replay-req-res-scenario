@@ -45,7 +45,7 @@ export class ReplayRecorder {
     const scenarioPath = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase);
     const opts = {
       host: this.recordPath.href.replace(/\/$/, ''),
-      record: talkback.Options.RecordMode.NEW,
+      record: talkback.Options.RecordMode.OVERWRITE,
       port,
       path: scenarioPath
     };
