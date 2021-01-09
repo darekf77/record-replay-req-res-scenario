@@ -30,7 +30,7 @@
     "main": "index.js"
   },
   "name": "record-replay-req-res-scenario",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "license": "MIT",
   "main": "index.js",
   "dependencies": {
