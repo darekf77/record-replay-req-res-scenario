@@ -4,13 +4,13 @@ import { Helpers, Project } from 'tnp-helpers';
 import { URL } from 'url';
 import { config } from 'tnp-config';
 import * as moment from 'moment';
-import talkback from 'talkback/es6';
+import { talkback, Options, RecordMode } from 'ng-talkback';
 import * as fuzzy from 'fuzzy';
 import * as glob from 'glob';
 import { Scenario } from './scenario.backend';
 import chalk from 'chalk';
 
-//import talkback from 'talkback/es6';
+//import talkback from 'ng-talkback/es6';
 
 
 
@@ -52,13 +52,12 @@ export class ReplayRecorder {
     const scenarioNameKebabKase = _.kebabCase(scenarioName);
 
     Helpers.log(`RECORD FROM: ${this.recordPath.href.replace(/\/$/, '')}`)
+    const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
+    if (!Helpers.exists(scenariosFolder)) {
+      Helpers.mkdirp(scenariosFolder);
+    }
     const scenarioPath = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase);
-    const opts = {
-      host: this.recordPath.href.replace(/\/$/, ''),
-      record: talkback.Options.RecordMode.OVERWRITE,
-      port,
-      path: scenarioPath
-    };
+
     Helpers.remove(scenarioPath);
     Helpers.remove(_.kebabCase(scenarioPath));
     const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
@@ -75,7 +74,45 @@ export class ReplayRecorder {
       }
     })
 
-    const server = talkback(opts);
+    const server = talkback({
+      host: this.recordPath.href.replace(/\/$/, ''),
+      record: RecordMode.OVERWRITE,
+      port,
+      path: scenarioPath,
+      debug: true,
+      ignoreBody: true,
+      bodyMatcher(tape, req) {
+        console.log(req.body)
+        return true;
+        // if (tape.meta.tag === "fake-post") {
+        //   var tapeBody = JSON.parse(tape.req.body.toString())
+        //   var reqBody = JSON.parse(req.body.toString())
+
+        //   return tapeBody.username === reqBody.username
+        // }
+        // return false
+      },
+      responseDecorator(tape, req, context) {
+        console.log(context)
+        console.log('decorator', req.body.toString())
+        // @LAST body is not working
+        // check dependencies OR ng-talkback
+
+
+
+        // if (tape.meta.tag === "auth") {
+        //   const tapeBody = JSON.parse(tape.res.body.toString())
+        //   const expiration = new Date()
+        //   expiration.setDate(expiration.getDate() + 1)
+        //   const expirationEpoch = Math.floor(expiration.getTime() / 1000)
+        //   tapeBody.expiration = expirationEpoch
+
+        //   const newBody = JSON.stringify(tapeBody)
+        //   tape.res.body = Buffer.from(newBody)
+        // }
+        return tape
+      }
+    } as Options);
     server.start(() => {
       Helpers.info(`"Talkback Started" on http://localhost:${port}`);
     });
@@ -99,33 +136,36 @@ export class ReplayRecorder {
         .replace(`--port=${port}`, '')
         .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
     }
+    // Helpers.log(`nameOrPath "${nameOrPath}"`)
+    const list = this.allScenarios;
+    const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPath, list, (m) => m.description);
+    // Helpers.log(`
+    // matches ${matches.length}: ${matches.join(', ')}
+    // results ${results.length}: ${results.map(s => s.basename).join(', ')}  `)
+    let scenarioToProcess = _.first(results);
 
-    const list = this.allScenarios.map(s => s.description);
-    const results = fuzzy.filter(nameOrPath, list)
-    const matches = results.map((el) => el.string);
-    const first = _.first(this.allScenarios);
-    let scenarioToProcess = first ? this.allScenarios.find(s => s.description === first.description) : void 0;
-
-    if (!first) {
+    if (!scenarioToProcess) {
       const scenarioFromPath = (path.isAbsolute(nameOrPath || '') && Helpers.exists(nameOrPath))
         ? nameOrPath : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPath || '').trim());
-      scenarioToProcess = Scenario.From(scenarioFromPath);
+      if (Helpers.exists(scenarioFromPath)) {
+        scenarioToProcess = Scenario.From(scenarioFromPath);
+      }
     }
 
     if (!scenarioToProcess) {
-      Helpers.error(`[record-replay-req-res-scenario] Not able to find scenario by name or path: ${nameOrPath}`);
+      Helpers.error(`[record - replay - req - res - scenario]`
+        + `Not able to find scenario by name or path "${nameOrPath}"`, false, true);
     }
     Helpers.info(`
 
-    Scenario to replay: ${chalk.bold(scenarioToProcess.basename)}
+    Scenario to replay: ${ chalk.bold(scenarioToProcess.basename)}
     "${scenarioToProcess.description}"
-    port: ${port}
+    port: ${ port}
 
-    `)
-    console.log((scenarioToProcess.requests))
-    process.exit(0)
+      `);
+
     await scenarioToProcess.start(new URL(`http://localhost:${port}`));
-    process.stdin.resume()
+    process.stdin.resume();
   }
 
 

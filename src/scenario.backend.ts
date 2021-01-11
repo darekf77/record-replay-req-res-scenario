@@ -68,16 +68,20 @@ export class Scenario {
   private initRequests() {
     const app = this.app;
     const allReq = this.requests;
-    for (let index = 0; index < allReq.length; index++) {
-      const element = allReq[index];
-      (() => {
-        app.use((req, res, next) => {
-          // @LAST compare
-          next();
-        });
-      })();
-    }
-
+    app.use((req, res, next) => {
+      const match = allReq.find(s => s.matchToReq(req));
+      if (match) {
+        Helpers.log(`MATCH: ${match.req.method} ${match.req.url}`);
+        _.keys(match.res.headers).forEach(headerKey => {
+          const headerString = (match.res.headers[headerKey] || []).join(', ');
+          res.set(headerKey, headerString)
+        })
+        res.send(match.req.body).status(match.res.status);
+      } else {
+        res.send('Dupa NOT MATCH')
+      }
+      next();
+    });
   }
 
   async start(url: URL) {

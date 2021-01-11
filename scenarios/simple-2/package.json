@@ -1,0 +1,12 @@
+{
+  "name": "simple-2",
+  "description": "simple2",
+  "version": "0.0.0",
+  "creationDate": "Sun Jan 10 2021",
+  "scripts": {
+    "start": "firedev serve"
+  },
+  "tnp": {
+    "type": "scenario"
+  }
+}

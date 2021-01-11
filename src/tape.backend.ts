@@ -1,4 +1,5 @@
-import BaseTape from 'talkback/tape';
+import * as express from 'express';
+import { Tape as BaseTape } from 'ng-talkback';
 
 export class Tape implements Partial<BaseTape> {
 
@@ -10,11 +11,20 @@ export class Tape implements Partial<BaseTape> {
     Object.assign(this, data);
   }
 
-  req: import('talkback/types').Req;
-  res?: import('talkback/types').Res;
-  options: import('talkback/options').Options;
+  matchToReq(req: express.Request) {
+    return (
+      (req.url === this.req.url)
+      && (req.method === this.req.method)
+      // && (req.body == this.req.body)
+    )
+  }
+
+
+  req: import('ng-talkback/types').Req;
+  res?: import('ng-talkback/types').Res;
+  options: import('ng-talkback/options').Options;
   queryParamsToIgnore: string[];
-  meta: import('talkback/types').Metadata;
+  meta: import('ng-talkback/types').Metadata;
   path?: string;
   new: boolean;
   used: boolean;
