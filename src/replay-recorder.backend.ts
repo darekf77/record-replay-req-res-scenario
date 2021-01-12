@@ -5,10 +5,11 @@ import { URL } from 'url';
 import { config } from 'tnp-config';
 import * as moment from 'moment';
 import { talkback, Options, RecordMode } from 'ng-talkback';
-import * as fuzzy from 'fuzzy';
 import * as glob from 'glob';
 import { Scenario } from './scenario.backend';
 import chalk from 'chalk';
+import * as inquirer from 'inquirer'
+
 
 //import talkback from 'ng-talkback/es6';
 
@@ -79,39 +80,7 @@ export class ReplayRecorder {
       record: RecordMode.OVERWRITE,
       port,
       path: scenarioPath,
-      debug: true,
-      ignoreBody: true,
-      bodyMatcher(tape, req) {
-        console.log(req.body)
-        return true;
-        // if (tape.meta.tag === "fake-post") {
-        //   var tapeBody = JSON.parse(tape.req.body.toString())
-        //   var reqBody = JSON.parse(req.body.toString())
-
-        //   return tapeBody.username === reqBody.username
-        // }
-        // return false
-      },
-      responseDecorator(tape, req, context) {
-        console.log(context)
-        console.log('decorator', req.body.toString())
-        // @LAST body is not working
-        // check dependencies OR ng-talkback
-
-
-
-        // if (tape.meta.tag === "auth") {
-        //   const tapeBody = JSON.parse(tape.res.body.toString())
-        //   const expiration = new Date()
-        //   expiration.setDate(expiration.getDate() + 1)
-        //   const expirationEpoch = Math.floor(expiration.getTime() / 1000)
-        //   tapeBody.expiration = expirationEpoch
-
-        //   const newBody = JSON.stringify(tapeBody)
-        //   tape.res.body = Buffer.from(newBody)
-        // }
-        return tape
-      }
+      silent: true,
     } as Options);
     server.start(() => {
       Helpers.info(`"Talkback Started" on http://localhost:${port}`);
@@ -127,31 +96,52 @@ export class ReplayRecorder {
       .filter(f => !!f)
   }
 
-  async replay(nameOrPath: string) {
+  async replay(nameOrPath: string, showListIfNotMatch = false) {
     let port = 3000;
     let options = require('minimist')((nameOrPath || '').split(' '));
-    if (!isNaN(Number(options.port))) {
-      port = Math.abs(Number(options.port));
-      nameOrPath = nameOrPath
-        .replace(`--port=${port}`, '')
-        .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
-    }
-    // Helpers.log(`nameOrPath "${nameOrPath}"`)
-    const list = this.allScenarios;
-    const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPath, list, (m) => m.description);
-    // Helpers.log(`
-    // matches ${matches.length}: ${matches.join(', ')}
-    // results ${results.length}: ${results.map(s => s.basename).join(', ')}  `)
-    let scenarioToProcess = _.first(results);
+    if (nameOrPath.trim() !== '') {
+      if (!isNaN(Number(options.port))) {
+        port = Math.abs(Number(options.port));
+        nameOrPath = nameOrPath
+          .replace(`--port=${port}`, '')
+          .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
+      }
+      // Helpers.log(`nameOrPath "${nameOrPath}"`)
+      const list = this.allScenarios;
+      const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPath, list, (m) => m.description);
+      // Helpers.log(`
+      // matches ${matches.length}: ${matches.join(', ')}
+      // results ${results.length}: ${results.map(s => s.basename).join(', ')}  `)
+      var scenarioToProcess = _.first(results);
 
-    if (!scenarioToProcess) {
-      const scenarioFromPath = (path.isAbsolute(nameOrPath || '') && Helpers.exists(nameOrPath))
-        ? nameOrPath : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPath || '').trim());
-      if (Helpers.exists(scenarioFromPath)) {
-        scenarioToProcess = Scenario.From(scenarioFromPath);
+      if (!scenarioToProcess) {
+        const scenarioFromPath = (path.isAbsolute(nameOrPath || '') && Helpers.exists(nameOrPath))
+          ? nameOrPath : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPath || '').trim());
+        if (Helpers.exists(scenarioFromPath)) {
+          scenarioToProcess = Scenario.From(scenarioFromPath);
+        }
       }
     }
 
+
+    if (!scenarioToProcess) {
+      if (showListIfNotMatch) {
+        const mainMessage = `Select scenario from list:`;
+        const choices = Scenario.allCurrent.map(c => {
+
+          return { name: c.basename, value: c }
+        });
+
+
+        const res = await inquirer.prompt({
+          type: 'list',
+          name: 'value',
+          message: mainMessage,
+          choices
+        } as any) as any;
+        scenarioToProcess = res.value;
+      }
+    }
     if (!scenarioToProcess) {
       Helpers.error(`[record - replay - req - res - scenario]`
         + `Not able to find scenario by name or path "${nameOrPath}"`, false, true);

@@ -9,8 +9,9 @@
   "version": "v2",
   "overrided": {
     "ignoreDepsPattern": [],
-    "includeAsDev": [],
+    "includeAsDev": "*",
     "includeOnly": [
+      "ng-talkback",
       "tnp-helpers"
     ],
     "dependencies": {},

@@ -2,36 +2,41 @@ import { Application } from 'express';
 import * as _ from 'lodash';
 import * as glob from 'glob';
 import * as path from 'path';
-import * as fse from 'fs-extra';
 import * as express from 'express';
 import * as http from 'http';
+import * as fse from 'fs-extra';
 import * as  cors from 'cors';
 import * as bodyParser from 'body-parser';
-import * as errorHandler from 'errorhandler';
 import * as cookieParser from 'cookie-parser';
 import * as methodOverride from 'method-override';
 import * as fileUpload from 'express-fileupload';
-import { createConnection, createConnections, getConnection } from 'typeorm';
-import { Connection } from 'typeorm';
-import { CLASS } from 'typescript-class-helpers';
 import { Models } from 'tnp-models';
 import { Helpers } from 'tnp-helpers';
 import { config } from 'tnp-config';
-import { Http2Server } from 'http2';
 import { URL } from 'url';
 import { Tape } from './tape.backend';
 
 export class Scenario {
 
-  static From(pathToScenario: string) {
+  public static get allCurrent() {
+    return !fse.existsSync(path.join(process.cwd(), config.folder.tmpScenarios)) ? [] : fse
+      .readdirSync(path.join(process.cwd(), config.folder.tmpScenarios))
+      .map(p => Scenario.From(p))
+      .filter(f => !!f)
+  }
 
-    return new Scenario(pathToScenario);
+  private static instances = {};
+  static From(pathToScenario: string) {
+    if (!Scenario.instances[pathToScenario]) {
+      Scenario.instances[pathToScenario] = new Scenario(pathToScenario)
+    }
+    return Scenario.instances[pathToScenario] as Scenario;
   }
 
   get basename() {
     return path.basename(this.location);
   }
-  get description() {
+  public get description() {
     return this.packageJson?.description ? this.packageJson?.description : _.startCase(this.packageJson?.name);
   }
   private packageJson: Models.npm.IPackageJSON;
@@ -65,22 +70,41 @@ export class Scenario {
     })()
   }
 
+  private respond(allReq, req, res) {
+
+    const match = allReq.find(s => s.matchToReq(req));
+    if (match) {
+      Helpers.log(`MATCH: ${match.req.method} ${match.req.url}`);
+      _.keys(match.res.headers).forEach(headerKey => {
+        const headerString = _.isArray(match.res.headers[headerKey]) ?
+          ((match.res.headers[headerKey] || []).join(', ')) :
+          match.res.headers[headerKey];
+        res.set(headerKey, headerString)
+      })
+      res.send(match.res.body); //.status(match.res.status);
+    } else {
+      res.send('Dupa NOT MATCH')
+    }
+  }
+
   private initRequests() {
     const app = this.app;
-    const allReq = this.requests;
-    app.use((req, res, next) => {
-      const match = allReq.find(s => s.matchToReq(req));
-      if (match) {
-        Helpers.log(`MATCH: ${match.req.method} ${match.req.url}`);
-        _.keys(match.res.headers).forEach(headerKey => {
-          const headerString = (match.res.headers[headerKey] || []).join(', ');
-          res.set(headerKey, headerString)
-        })
-        res.send(match.req.body).status(match.res.status);
-      } else {
-        res.send('Dupa NOT MATCH')
-      }
-      next();
+    const allReq = this.tapes;
+
+    app.get(/^\/(.*)/, (req, res) => {
+      this.respond(allReq, req, res);
+    });
+    app.post(/^\/(.*)/, (req, res) => {
+      this.respond(allReq, req, res);
+    });
+    app.delete(/^\/(.*)/, (req, res) => {
+      this.respond(allReq, req, res);
+    });
+    app.put(/^\/(.*)/, (req, res) => {
+      this.respond(allReq, req, res);
+    });
+    app.head(/^\/(.*)/, (req, res) => {
+      this.respond(allReq, req, res);
     });
   }
 
@@ -97,7 +121,7 @@ export class Scenario {
   }
 
 
-  get requests() {
+  get tapes() {
     const all = glob
       .sync(`${this.location}/**/*.json5`) as any;
     for (let index = 0; index < all.length; index++) {
