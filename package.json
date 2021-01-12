@@ -32,7 +32,7 @@
   },
   "name": "record-replay-req-res-scenario",
   "version": "0.0.4",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "main": "index.js",
   "dependencies": {
     "ng-talkback": "2.4.2",
@@ -259,7 +259,7 @@
     "webpack-cli": "3.3.11",
     "zone.js": "~0.10.2"
   },
-  "private": false,
+  "private": true,
   "husky": {
     "hooks": {
       "pre-push": "tnp deps:show:if:standalone"
