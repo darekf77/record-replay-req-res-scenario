@@ -1,3 +1,4 @@
+//#region imports
 import * as _ from 'lodash';
 import * as path from 'path';
 import { Helpers, Project } from 'tnp-helpers';
@@ -9,28 +10,29 @@ import * as glob from 'glob';
 import { Scenario } from './scenario.backend';
 import chalk from 'chalk';
 import * as inquirer from 'inquirer'
+//#endregion
 
-
-//import talkback from 'ng-talkback/es6';
-
-
-
-export class ReplayRecorder {
+export class RestScenarioRepRec {
 
   //#region singleton
-  private static _instance = new ReplayRecorder();
+  private static _instance = new RestScenarioRepRec();
 
   constructor(
     protected readonly cwd = process.cwd()
   ) {
-
+    const pathToScenarios = path.join(cwd, config.folder.scenarios);
+    const pathToScenariosTemp = path.join(cwd, config.folder.tmpScenarios);
+    if (!Helpers.exists(pathToScenarios)) {
+      Helpers.createSymLink(pathToScenariosTemp, pathToScenarios,
+        { continueWhenExistedFolderDoesntExists: true })
+    }
   }
   public static get Instance() {
     return this._instance;
   }
   //#endregion
 
-  recordPath: URL;
+  //#region record
   async record(serverHostOrPort: string, scenarioName?: string) {
     const currentDate = new Date();
     let port = 5544;
@@ -43,7 +45,7 @@ export class ReplayRecorder {
     if (!isNaN(Number(serverHostOrPort))) {
       url = `http://localhost:${Number(serverHostOrPort)}`;
     }
-    this.recordPath = new URL(url);
+    const recordPath = new URL(url);
 
     let orgNameScenario = scenarioName;
     if (!_.isString(scenarioName) || scenarioName.trim() === '') {
@@ -52,7 +54,7 @@ export class ReplayRecorder {
     }
     const scenarioNameKebabKase = _.kebabCase(scenarioName);
 
-    Helpers.log(`RECORD FROM: ${this.recordPath.href.replace(/\/$/, '')}`)
+    Helpers.log(`RECORD FROM: ${recordPath.href.replace(/\/$/, '')}`)
     const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
     if (!Helpers.exists(scenariosFolder)) {
       Helpers.mkdirp(scenariosFolder);
@@ -76,7 +78,7 @@ export class ReplayRecorder {
     })
 
     const server = talkback({
-      host: this.recordPath.href.replace(/\/$/, ''),
+      host: recordPath.href.replace(/\/$/, ''),
       record: RecordMode.OVERWRITE,
       port,
       path: scenarioPath,
@@ -88,35 +90,58 @@ export class ReplayRecorder {
 
     process.stdin.resume()
   }
+  //#endregion
 
-  get allScenarios() {
+  //#region all scenaroios
+  public get allScenarios() {
     return glob.sync(`${path.join(this.cwd, config.folder.tmpScenarios)}/*`)
       .filter(f => !!Project.From(f))
       .map(f => Scenario.From(f))
       .filter(f => !!f)
   }
+  //#endregion
 
-  async replay(nameOrPath: string, showListIfNotMatch = false) {
+  //#region select scenario
+  async selectScenario(
+    mainMessage = `Select scenario from list:`
+  ): Promise<Scenario> {
+    const choices = Scenario.allCurrent.map(c => {
+      return { name: `"${c.description}"`, value: c }
+    });
+
+
+    const res = await inquirer.prompt({
+      type: 'list',
+      name: 'value',
+      message: mainMessage,
+      choices
+    } as any) as any;
+    return res.value;
+  }
+  //#endregion
+
+  //#region replay
+  async replay(nameOrPathOrDescription: string, showListIfNotMatch = false) {
     let port = 3000;
-    let options = require('minimist')((nameOrPath || '').split(' '));
-    if (nameOrPath.trim() !== '') {
+    let options = require('minimist')((nameOrPathOrDescription || '').split(' '));
+    if (nameOrPathOrDescription.trim() !== '') {
       if (!isNaN(Number(options.port))) {
         port = Math.abs(Number(options.port));
-        nameOrPath = nameOrPath
+        nameOrPathOrDescription = nameOrPathOrDescription
           .replace(`--port=${port}`, '')
           .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
       }
       // Helpers.log(`nameOrPath "${nameOrPath}"`)
       const list = this.allScenarios;
-      const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPath, list, (m) => m.description);
+      const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPathOrDescription, list, (m) => m.description);
       // Helpers.log(`
       // matches ${matches.length}: ${matches.join(', ')}
       // results ${results.length}: ${results.map(s => s.basename).join(', ')}  `)
       var scenarioToProcess = _.first(results);
 
       if (!scenarioToProcess) {
-        const scenarioFromPath = (path.isAbsolute(nameOrPath || '') && Helpers.exists(nameOrPath))
-          ? nameOrPath : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPath || '').trim());
+        const scenarioFromPath = (path.isAbsolute(nameOrPathOrDescription || '') && Helpers.exists(nameOrPathOrDescription))
+          ? nameOrPathOrDescription : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPathOrDescription || '').trim());
         if (Helpers.exists(scenarioFromPath)) {
           scenarioToProcess = Scenario.From(scenarioFromPath);
         }
@@ -126,25 +151,12 @@ export class ReplayRecorder {
 
     if (!scenarioToProcess) {
       if (showListIfNotMatch) {
-        const mainMessage = `Select scenario from list:`;
-        const choices = Scenario.allCurrent.map(c => {
-
-          return { name: c.basename, value: c }
-        });
-
-
-        const res = await inquirer.prompt({
-          type: 'list',
-          name: 'value',
-          message: mainMessage,
-          choices
-        } as any) as any;
-        scenarioToProcess = res.value;
+        scenarioToProcess = await this.selectScenario();
       }
     }
     if (!scenarioToProcess) {
       Helpers.error(`[record - replay - req - res - scenario]`
-        + `Not able to find scenario by name or path "${nameOrPath}"`, false, true);
+        + `Not able to find scenario by name or path "${nameOrPathOrDescription}"`, false, true);
     }
     Helpers.info(`
 
@@ -157,6 +169,6 @@ export class ReplayRecorder {
     await scenarioToProcess.start(new URL(`http://localhost:${port}`));
     process.stdin.resume();
   }
-
+  //#endregion
 
 }

@@ -19,9 +19,10 @@ import { Tape } from './tape.backend';
 export class Scenario {
 
   public static get allCurrent() {
-    return !fse.existsSync(path.join(process.cwd(), config.folder.tmpScenarios)) ? [] : fse
-      .readdirSync(path.join(process.cwd(), config.folder.tmpScenarios))
-      .map(p => Scenario.From(p))
+    const currentScenariosFolder = path.join(process.cwd(), config.folder.tmpScenarios);
+    return !fse.existsSync(currentScenariosFolder) ? [] : fse
+      .readdirSync(currentScenariosFolder)
+      .map(p => Scenario.From(path.join(currentScenariosFolder, p)))
       .filter(f => !!f)
   }
 
@@ -43,7 +44,9 @@ export class Scenario {
   constructor(
     private readonly location: string
   ) {
-    this.packageJson = Helpers.readJson(path.join(location, config.file.package_json));
+    const pathToScenarioPackageJson = path.join(location, config.file.package_json);
+    // Helpers.log(`path to scenario pj: ${pathToScenarioPackageJson}`)
+    this.packageJson = Helpers.readJson(pathToScenarioPackageJson);
   }
 
   private app: Application;
