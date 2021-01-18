@@ -9,15 +9,16 @@ import { talkback, Options, RecordMode } from 'ng-talkback';
 import * as glob from 'glob';
 import { Scenario } from './scenario.backend';
 import chalk from 'chalk';
-import * as inquirer from 'inquirer'
+import * as inquirer from 'inquirer';
+import { Models } from 'tnp-models';
 //#endregion
 
 export class RestScenarioRepRec {
 
   //#region singleton
-  private static _instance = new RestScenarioRepRec();
+  private static _instances = {};
 
-  constructor(
+  private constructor(
     protected readonly cwd = process.cwd()
   ) {
     const pathToScenarios = path.join(cwd, config.folder.scenarios);
@@ -27,67 +28,113 @@ export class RestScenarioRepRec {
         { continueWhenExistedFolderDoesntExists: true })
     }
   }
-  public static get Instance() {
-    return this._instance;
+  public static Instance(cwd = process.cwd()) {
+    if (!RestScenarioRepRec._instances[cwd]) {
+      RestScenarioRepRec._instances[cwd] = new RestScenarioRepRec(cwd);
+    }
+    return RestScenarioRepRec._instances[cwd] as RestScenarioRepRec;
   }
   //#endregion
 
   //#region record
-  async record(serverHostOrPort: string, scenarioName?: string) {
+  async record(serverHostOrPort: string | string[], scenarioName?: string, serverSubName = 'default') {
     const currentDate = new Date();
-    let port = 5544;
+    let ports = [5544];
     let options = require('minimist')((scenarioName || '').split(' '));
-    if (!isNaN(Number(options.port))) {
-      port = Number(options.port);
+    if (_.isArray(options.port)) {
+      ports = options.port;
+    } else if (!isNaN(Number(options.port))) {
+      ports = [Number(options.port)];
     }
 
-    let url = serverHostOrPort;
-    if (!isNaN(Number(serverHostOrPort))) {
-      url = `http://localhost:${Number(serverHostOrPort)}`;
-    }
-    const recordPath = new URL(url);
+    ports = ports.map(p => Number(p)) as number[];
+    ports = _.sortBy(ports);
 
+    if (!_.isArray(serverHostOrPort) && _.isString(serverHostOrPort)) {
+      serverHostOrPort = [serverHostOrPort];
+    }
+
+    const hosts = serverHostOrPort.map(url => {
+      if (!isNaN(Number(url))) {
+        url = `http://localhost:${Number(serverHostOrPort)}`;
+      }
+      const recordPath = new URL(url);
+      return recordPath;
+    })
+    const isGroup = (hosts.length > 1);
+    const groupName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;
     let orgNameScenario = scenarioName;
     if (!_.isString(scenarioName) || scenarioName.trim() === '') {
-      scenarioName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;
+      scenarioName = groupName;
       orgNameScenario = _.startCase(scenarioName);
     }
     const scenarioNameKebabKase = _.kebabCase(scenarioName);
 
-    Helpers.log(`RECORD FROM: ${recordPath.href.replace(/\/$/, '')}`)
-    const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
-    if (!Helpers.exists(scenariosFolder)) {
-      Helpers.mkdirp(scenariosFolder);
+    if (isGroup) {
+      const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
+      Helpers.writeFile(packageJsonFroScenario, {
+        name: scenarioNameKebabKase,
+        description: orgNameScenario,
+        version: '0.0.0',
+        creationDate: currentDate.toDateString(),
+        scripts: {
+          start: 'firedev serve',
+        },
+        tnp: {
+          type: 'scenario',
+          isGroup,
+          groupSize: hosts.length,
+          groupName: isGroup ? groupName : void 0
+        } as any
+      } as Partial<Models.npm.IPackageJSON>)
     }
-    const scenarioPath = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase);
 
-    Helpers.remove(scenarioPath);
-    Helpers.remove(_.kebabCase(scenarioPath));
-    const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
-    Helpers.writeFile(packageJsonFroScenario, {
-      name: scenarioNameKebabKase,
-      description: orgNameScenario,
-      version: '0.0.0',
-      creationDate: currentDate.toDateString(),
-      scripts: {
-        start: 'firedev serve',
-      },
-      tnp: {
-        type: 'scenario'
+    for (let index = 0; index < hosts.length; index++) {
+      const recordPath = hosts[index];
+
+
+      Helpers.log(`RECORD FROM: ${recordPath.href.replace(/\/$/, '')}`)
+      const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
+      if (!Helpers.exists(scenariosFolder)) {
+        Helpers.mkdirp(scenariosFolder);
       }
-    })
 
-    const server = talkback({
-      host: recordPath.href.replace(/\/$/, ''),
-      record: RecordMode.OVERWRITE,
-      port,
-      path: scenarioPath,
-      silent: true,
-    } as Options);
-    server.start(() => {
-      Helpers.info(`"Talkback Started" on http://localhost:${port}`);
-    });
+      const scenarioPath = path.join(
+        this.cwd,
+        config.folder.tmpScenarios,
+        scenarioNameKebabKase,
+        (isGroup ? ports[index].toString() : '')
+      );
 
+      Helpers.remove(scenarioPath);
+      Helpers.remove(_.kebabCase(scenarioPath));
+      if (!isGroup) {
+        const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
+        Helpers.writeFile(packageJsonFroScenario, {
+          name: scenarioNameKebabKase,
+          description: orgNameScenario,
+          version: '0.0.0',
+          creationDate: currentDate.toDateString(),
+          scripts: {
+            start: 'firedev serve',
+          },
+          tnp: {
+            type: 'scenario',
+          } as any
+        } as Partial<Models.npm.IPackageJSON>)
+      }
+
+      const server = talkback({
+        host: recordPath.href.replace(/\/$/, ''),
+        record: RecordMode.OVERWRITE,
+        port: ports[index],
+        path: scenarioPath,
+        silent: true,
+      } as Options);
+      server.start(() => {
+        Helpers.info(`"Talkback Started" on http://localhost:${ports[index]}`);
+      });
+    }
     process.stdin.resume()
   }
   //#endregion
@@ -121,16 +168,23 @@ export class RestScenarioRepRec {
   //#endregion
 
   //#region replay
-  async replay(nameOrPathOrDescription: string, showListIfNotMatch = false) {
-    let port = 3000;
+  async resolveScenarioData(nameOrPathOrDescription: string, showListIfNotMatch = false) {
+    let ports = [3000];
     let options = require('minimist')((nameOrPathOrDescription || '').split(' '));
+    let isGroup = false;
     if (nameOrPathOrDescription.trim() !== '') {
-      if (!isNaN(Number(options.port))) {
-        port = Math.abs(Number(options.port));
+      if (_.isArray(options.port)) {
+        ports = options.port;
+      } else if (!isNaN(Number(options.port))) {
+        ports = [Math.abs(Number(options.port))];
+      }
+      ports = _.sortBy(ports.map(p => Number(p))) as number[];
+      isGroup = (ports.length > 1);
+      ports.forEach(port => {
         nameOrPathOrDescription = nameOrPathOrDescription
           .replace(`--port=${port}`, '')
           .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
-      }
+      });
       // Helpers.log(`nameOrPath "${nameOrPath}"`)
       const list = this.allScenarios;
       const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPathOrDescription, list, (m) => m.description);
@@ -158,16 +212,15 @@ export class RestScenarioRepRec {
       Helpers.error(`[record - replay - req - res - scenario]`
         + `Not able to find scenario by name or path "${nameOrPathOrDescription}"`, false, true);
     }
+
     Helpers.info(`
 
-    Scenario to replay: ${ chalk.bold(scenarioToProcess.basename)}
+    Scenario to replay: ${chalk.bold(scenarioToProcess.basename)}
     "${scenarioToProcess.description}"
-    port: ${ port}
+    port(s): ${isGroup ? ports.join(',') : _.first(ports)}
 
       `);
-
-    await scenarioToProcess.start(new URL(`http://localhost:${port}`));
-    process.stdin.resume();
+    return { scenario: scenarioToProcess, port: _.first(ports), ports };
   }
   //#endregion
 
