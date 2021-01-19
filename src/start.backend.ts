@@ -7,11 +7,14 @@ export async function run(args: string[]) {
   const command: 'record' | 'replay' = args.shift() as any;
   if (command === 'record') {
     Helpers.clearConsole();
-    await ins.record(args.shift(), args.join(' '))
+    await ins.record(args)
   }
   if (command === 'replay') {
-    const { scenario, ports, port } = await ins.resolveScenarioData(args.join(' '), true);
-    await scenario.start(ports);
+    const scenarioArgs = await ins.resolveScenariosData(args);
+    for (let index = 0; index < scenarioArgs.length; index++) {
+      const s = scenarioArgs[index];
+      await s.scenario.start(s.params);
+    }
     process.stdin.resume();
   }
 }

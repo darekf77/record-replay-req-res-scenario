@@ -7,13 +7,55 @@ import { config } from 'tnp-config';
 import * as moment from 'moment';
 import { talkback, Options, RecordMode } from 'ng-talkback';
 import * as glob from 'glob';
-import { Scenario } from './scenario.backend';
+import { Scenario, ScenarioParam, ScenarioParams, ScenarioParamsReturn } from './scenario.backend';
 import chalk from 'chalk';
 import * as inquirer from 'inquirer';
 import { Models } from 'tnp-models';
 //#endregion
 
+export type RecorderConfigMeta = {
+  [recordHostName: string]: { host: number | string | URL; talkbackProxyPort?: number | string; }
+} & { scenarioName: string; }
+
+export type ReplayConfigMeta = {
+  [recordHostName: string]: { talkbackProxyPort?: number | string; }
+} & { scenarioPath: string; }
+
+interface RecordArgType {
+  record: {
+    /**
+     * url with host to record
+     */
+    url: URL;
+    /**
+     * Identifier of what was the name or id of server.
+     * this metadata is usefull to replay back multiple servers
+     * on different talkback ports
+     */
+    name: string;
+  };
+  /**
+   * talkback port for localhost proxy
+   */
+  talkbackProxyPort: number;
+}
+
+interface ScenarioArgType {
+  scenario: Scenario;
+  /**
+   * How to map multiple servers to multiple replay instances
+   */
+  params?: ScenarioParamsReturn | URL[];
+}
+
 export class RestScenarioRepRec {
+
+  /**
+   * by pinging to http://localhost:5544/path/to/something
+   * you are actually recording request from
+   * by pinging to http://< host for recording >/path/to/something
+   */
+  readonly DEFAULT_TALKBACK_PROXY_SERVER_PORT = 5544;
 
   //#region singleton
   private static _instances = {};
@@ -36,105 +78,140 @@ export class RestScenarioRepRec {
   }
   //#endregion
 
-  //#region record
-  async record(serverHostOrPort: string | string[], scenarioName?: string, serverSubName = 'default') {
-    const currentDate = new Date();
-    let ports = [5544];
-    let options = require('minimist')((scenarioName || '').split(' '));
-    if (_.isArray(options.port)) {
-      ports = options.port;
-    } else if (!isNaN(Number(options.port))) {
-      ports = [Number(options.port)];
-    }
+  //#region resolve recoard args
+  private resolveArgsRecord(serverHostOrPort: string | string[] | RecorderConfigMeta)
+    : { args: RecordArgType[]; scenarioName: string; } {
 
-    ports = ports.map(p => Number(p)) as number[];
-    ports = _.sortBy(ports);
+    const results = [] as RecordArgType[];
+    const configMeta = ((_.isObject(serverHostOrPort) && !_.isArray(serverHostOrPort))
+      ? serverHostOrPort : void 0) as RecorderConfigMeta;
+    let scenarioName = '' as string;
+    let talkbackPorts = [this.DEFAULT_TALKBACK_PROXY_SERVER_PORT];
 
-    if (!_.isArray(serverHostOrPort) && _.isString(serverHostOrPort)) {
-      serverHostOrPort = [serverHostOrPort];
-    }
-
-    const hosts = serverHostOrPort.map(url => {
-      if (!isNaN(Number(url))) {
-        url = `http://localhost:${Number(serverHostOrPort)}`;
+    if (configMeta) {
+      //#region by config
+      scenarioName = configMeta.scenarioName;
+      _.keys(configMeta).forEach(name => {
+        const url = Helpers.urlParse(configMeta[name].host);
+        results.push({
+          record: {
+            name,
+            url
+          },
+          talkbackProxyPort: Number(configMeta[name].talkbackProxyPort)
+        })
+      })
+      //#endregion
+    } else {
+      //#region by command line argument
+      const { commandString, resolved } = Helpers.cliTool.argsFromBegin<URL>(
+        serverHostOrPort as string,
+        a => Helpers.urlParse(a)
+      );
+      scenarioName = commandString;
+      let options = Helpers.cliTool.argsFrom<{ port: string; }>(scenarioName);
+      if (_.isArray(options.port)) {
+        talkbackPorts = options.port;
+      } else if (!isNaN(Number(options.port))) {
+        talkbackPorts = [Number(options.port)];
       }
-      const recordPath = new URL(url);
-      return recordPath;
-    })
-    const isGroup = (hosts.length > 1);
-    const groupName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;
-    let orgNameScenario = scenarioName;
+
+      if (talkbackPorts.length === 1) {
+        _.times((resolved.length - talkbackPorts.length), () => talkbackPorts.push(_.first(talkbackPorts)));
+      }
+      if (talkbackPorts.length !== resolved.length) {
+        Helpers.error(`[rec-scenario-rep-rec] Incorrect configuration of ports:
+          recordHosts = ${resolved.map(c => Helpers.urlParse(c)).join(', ')}
+          talkback ports = ${talkbackPorts.join(', ')}
+
+          `, false, true);
+      }
+
+      resolved.forEach((recordHost, i) => {
+        results.push({
+          record: {
+            name: '',
+            url: recordHost
+          },
+          talkbackProxyPort: talkbackPorts[i]
+        })
+      });
+      //#endregion
+    }
+
+    return { args: results, scenarioName };
+  }
+  //#endregion
+
+  //#region record
+  /**
+   *  rest-scenario-rep-rec record http://localhost:4444 Recording localhost data
+   *  rest-scenario-rep-rec record http://192.168.10.22:4444 Test scenario
+   *  rest-scenario-rep-rec record 4444 local setup test
+   *  rest-scenario-rep-rec record 4444 5555 http://192.168.12.3 "my super scenario"
+   *  rest-scenario-rep-rec record 4444 5555 http://192.168.12.3 192.158.32.3 'my super scenario --port 6767'
+  *                                <port or host for record   >  <scenario name    > < talkbback server ports for proxy >
+   *  rest-scenario-rep-rec record 4444 5555  http://my.api.com   'my super scenario --port 6767 --port 7777 --port 8888'
+   *  ins.record( { portOrHost: http://192.129.23.12; name: 'localApiProxy'  }, 'super scenario')
+   */
+  async record(serverHostOrPort: string | string[] | RecorderConfigMeta) {
+    const currentDate = new Date();
+    let { args, scenarioName } = this.resolveArgsRecord(serverHostOrPort);
+
+    //#region prepare main scenario folder
+    let description = scenarioName;
     if (!_.isString(scenarioName) || scenarioName.trim() === '') {
-      scenarioName = groupName;
-      orgNameScenario = _.startCase(scenarioName);
+      scenarioName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;;
+      description = _.startCase(scenarioName);
     }
     const scenarioNameKebabKase = _.kebabCase(scenarioName);
-
-    if (isGroup) {
-      const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
-      Helpers.writeFile(packageJsonFroScenario, {
-        name: scenarioNameKebabKase,
-        description: orgNameScenario,
-        version: '0.0.0',
-        creationDate: currentDate.toDateString(),
-        scripts: {
-          start: 'firedev serve',
-        },
-        tnp: {
-          type: 'scenario',
-          isGroup,
-          groupSize: hosts.length,
-          groupName: isGroup ? groupName : void 0
-        } as any
-      } as Partial<Models.npm.IPackageJSON>)
+    const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
+    const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
+    if (!Helpers.exists(scenariosFolder)) {
+      Helpers.mkdirp(scenariosFolder);
     }
+    //#endregion
 
-    for (let index = 0; index < hosts.length; index++) {
-      const recordPath = hosts[index];
+    //#region write package.json
+    Helpers.writeFile(packageJsonFroScenario, {
+      name: scenarioNameKebabKase,
+      description,
+      version: '0.0.0',
+      creationDate: currentDate.toDateString(),
+      scripts: {
+        start: 'firedev serve',
+      },
+      tnp: {
+        type: 'scenario',
+      } as any,
+    } as Partial<Models.npm.IPackageJSON>);
+    //#endregion
 
-
-      Helpers.log(`RECORD FROM: ${recordPath.href.replace(/\/$/, '')}`)
-      const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
-      if (!Helpers.exists(scenariosFolder)) {
-        Helpers.mkdirp(scenariosFolder);
-      }
+    args.forEach(recData => {
+      Helpers.log(`RECORD FROM: ${recData.record.url.href}`)
 
       const scenarioPath = path.join(
         this.cwd,
         config.folder.tmpScenarios,
         scenarioNameKebabKase,
-        (isGroup ? ports[index].toString() : '')
+        `${(_.kebabCase(recData.record.url.href)).toString()}__${_.camelCase(recData.record.name)}`
       );
 
       Helpers.remove(scenarioPath);
-      Helpers.remove(_.kebabCase(scenarioPath));
-      if (!isGroup) {
-        const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
-        Helpers.writeFile(packageJsonFroScenario, {
-          name: scenarioNameKebabKase,
-          description: orgNameScenario,
-          version: '0.0.0',
-          creationDate: currentDate.toDateString(),
-          scripts: {
-            start: 'firedev serve',
-          },
-          tnp: {
-            type: 'scenario',
-          } as any
-        } as Partial<Models.npm.IPackageJSON>)
-      }
 
       const server = talkback({
-        host: recordPath.href.replace(/\/$/, ''),
+        host: recData.record.url.host,
         record: RecordMode.OVERWRITE,
-        port: ports[index],
+        port: recData.talkbackProxyPort,
         path: scenarioPath,
         silent: true,
       } as Options);
       server.start(() => {
-        Helpers.info(`"Talkback Started" on http://localhost:${ports[index]}`);
+        Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
+          + `(http://localhost:${recData.talkbackProxyPort})`);
       });
-    }
+    })
+
     process.stdin.resume()
   }
   //#endregion
@@ -167,60 +244,106 @@ export class RestScenarioRepRec {
   }
   //#endregion
 
-  //#region replay
-  async resolveScenarioData(nameOrPathOrDescription: string, showListIfNotMatch = false) {
-    let ports = [3000];
-    let options = require('minimist')((nameOrPathOrDescription || '').split(' '));
-    let isGroup = false;
-    if (nameOrPathOrDescription.trim() !== '') {
-      if (_.isArray(options.port)) {
-        ports = options.port;
-      } else if (!isNaN(Number(options.port))) {
-        ports = [Math.abs(Number(options.port))];
+  private resolveReplayData(nameOrPathOrDescription: string | string[] | ReplayConfigMeta) {
+    if (_.isObject(nameOrPathOrDescription)) {
+      //#region config
+      const configMeta = nameOrPathOrDescription as ReplayConfigMeta;
+      const scenario = Scenario.From(configMeta.scenarioPath)
+      if (!scenario) {
+        Helpers.error(`[rest-scenario...] Scenario not found in "${configMeta.scenarioPath}"`
+          , false, true)
       }
-      ports = _.sortBy(ports.map(p => Number(p))) as number[];
-      isGroup = (ports.length > 1);
-      ports.forEach(port => {
-        nameOrPathOrDescription = nameOrPathOrDescription
-          .replace(`--port=${port}`, '')
-          .replace(new RegExp(Helpers.escapeStringForRegEx(`--port\ +${port}`)), '')
-      });
-      // Helpers.log(`nameOrPath "${nameOrPath}"`)
-      const list = this.allScenarios;
-      const { matches, results } = Helpers.arrays.fuzzy<Scenario>(nameOrPathOrDescription, list, (m) => m.description);
-      // Helpers.log(`
-      // matches ${matches.length}: ${matches.join(', ')}
-      // results ${results.length}: ${results.map(s => s.basename).join(', ')}  `)
-      var scenarioToProcess = _.first(results);
+      return [{
+        scenario,
+        params: _
+          .keys(configMeta)
+          .filter(key => _.isObject(configMeta[key]))
+          .reduce((prev, curr) => {
+            const v = configMeta[curr];
+            const toMerge: ScenarioParamsReturn = {
+              [curr]: Helpers.urlParse(v.talkbackProxyPort)
+            };
+            return _.merge(prev, toMerge);
+          }, {} as ScenarioParamsReturn)
+      } as ScenarioArgType];
+      //#endregion
+    } else {
+      let portsOrUrlsForReplayServer = [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)] as URL[];
+      nameOrPathOrDescription = (_.isArray(nameOrPathOrDescription)
+        ? nameOrPathOrDescription.join(' ') : nameOrPathOrDescription) as string;
 
-      if (!scenarioToProcess) {
-        const scenarioFromPath = (path.isAbsolute(nameOrPathOrDescription || '') && Helpers.exists(nameOrPathOrDescription))
-          ? nameOrPathOrDescription : path.join(this.cwd, config.folder.tmpScenarios, (nameOrPathOrDescription || '').trim());
-        if (Helpers.exists(scenarioFromPath)) {
-          scenarioToProcess = Scenario.From(scenarioFromPath);
+      const args = Helpers.cliTool.argsFrom<{ port: string | string[] }>(nameOrPathOrDescription);
+      nameOrPathOrDescription = Helpers.urlClearOptions<{ port: string | string[] }>(
+        nameOrPathOrDescription, args);
+
+      const { resolved, commandString } = Helpers.cliTool
+        .argsFromBegin<Scenario>(nameOrPathOrDescription, possiblePathToScenario => {
+          const scenarioFromPath = (
+            path.isAbsolute(possiblePathToScenario || '') &&
+            Helpers.exists(possiblePathToScenario))
+            ? possiblePathToScenario
+            : path.join(
+              this.cwd,
+              config.folder.tmpScenarios,
+              (possiblePathToScenario || '').trim());
+          return Scenario.From(scenarioFromPath);
+        });
+      nameOrPathOrDescription = commandString;
+      let scenarios = resolved;
+
+      if (scenarios.length === 0) {
+        const list = this.allScenarios;
+        const { matches, results } = Helpers
+          .arrays
+          .fuzzy<Scenario>(nameOrPathOrDescription, list, (m) => m.description);
+        scenarios = scenarios.concat(results);
+      }
+
+      return scenarios.map((scenario) => {
+        return {
+          scenario,
+          params: portsOrUrlsForReplayServer.map(p => Helpers.urlParse(p))
         }
-      }
+      }) as ScenarioArgType[];
     }
+  }
 
+  //#region replay
+  async resolveScenariosData(
+    nameOrPathOrDescription: string | string[] | ReplayConfigMeta,
+    showListIfNotMatch = false
+  ) {
 
-    if (!scenarioToProcess) {
+    const scenariosArgs = this.resolveReplayData(nameOrPathOrDescription);
+
+    if (scenariosArgs.length === 0) {
       if (showListIfNotMatch) {
-        scenarioToProcess = await this.selectScenario();
+        const selectedScenario = await this.selectScenario();
+        selectedScenario && scenariosArgs.push({
+          params: {},
+          scenario: selectedScenario
+        });
       }
     }
-    if (!scenarioToProcess) {
+    if (scenariosArgs.length === 0) {
       Helpers.error(`[record - replay - req - res - scenario]`
         + `Not able to find scenario by name or path "${nameOrPathOrDescription}"`, false, true);
     }
 
+    const tmpScenarioInfo = (s: ScenarioArgType) => {
+      const paramsTmpls = _.keys(s.params).reduce((a, b) => {
+        return `${a}\n\t${chalk.bold(b)}:${s.params[b].href}`
+      }, '')
+      return `> ${chalk.bold(s.scenario.basename)}` +
+        `"${s.scenario.description}"` +
+        paramsTmpls;
+    };
+
     Helpers.info(`
-
-    Scenario to replay: ${chalk.bold(scenarioToProcess.basename)}
-    "${scenarioToProcess.description}"
-    port(s): ${isGroup ? ports.join(',') : _.first(ports)}
-
-      `);
-    return { scenario: scenarioToProcess, port: _.first(ports), ports };
+    (${chalk.bold(scenariosArgs.length.toString())}) scenario(s) to replay: ` +
+      `${scenariosArgs.map(s => tmpScenarioInfo(s)).join('\n')}`
+    );
+    return scenariosArgs;
   }
   //#endregion
 

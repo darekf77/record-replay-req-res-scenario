@@ -16,6 +16,12 @@ import { config } from 'tnp-config';
 import { URL } from 'url';
 import { Tape } from './tape.backend';
 
+export type PortOrURL = URL | number;
+export type ScenarioParams = { [nameOfParam: string]: PortOrURL; };
+export type ScenarioParamsReturn = { [nameOfParam: string]: Exclude<PortOrURL, number>; };
+export type ScenarioParam = { name: string; portOrUrl: PortOrURL; }
+export type ScenarioParamReturn = { name: string; portOrUrl: Exclude<PortOrURL, number>; }
+
 export class Scenario {
 
   public static get allCurrent() {
@@ -28,23 +34,13 @@ export class Scenario {
 
   private static instances = {};
   static From(pathToScenario: string) {
+    if (!Helpers.exists(pathToScenario)) {
+      return void 0;
+    }
     if (!Scenario.instances[pathToScenario]) {
       Scenario.instances[pathToScenario] = new Scenario(pathToScenario)
     }
     return Scenario.instances[pathToScenario] as Scenario;
-  }
-
-  get groupName() {
-    return (this.isGroup && this.packageJson?.tnp?.groupName)
-      ? this.packageJson.tnp.groupName : void 0;
-  }
-
-  get isGroup() {
-    return this.packageJson.tnp.isGroup;
-  }
-
-  get groupSize() {
-    return this.packageJson.tnp.groupSize;
   }
 
   get basename() {
@@ -87,8 +83,8 @@ export class Scenario {
   }
 
 
-  private initRequests(app: express.Application, port: number) {
-    const allReq = this.tapes(port);
+  private initRequests(app: express.Application, name?: string) {
+    const allReq = this.tapes(name);
 
     app.get(/^\/(.*)/, (req, res) => {
       respond(allReq, req, res);
@@ -107,53 +103,64 @@ export class Scenario {
     });
   }
 
-  async start(urlsOrPorts: URL | URL[] | number | number[]) {
-    return new Promise((resolve, reject) => {
-      if (!_.isArray(urlsOrPorts)) {
-        urlsOrPorts = [urlsOrPorts as any]
-      }
-      urlsOrPorts = (urlsOrPorts as any[]).map(urlOrPort => {
-        if (_.isString(urlOrPort)) {
-          urlOrPort = Number(urlOrPort)
+  async start(urlsOrPorts: number | number[] | URL | URL[] | ScenarioParams) {
+    if (_.isString(urlsOrPorts)) {
+      urlsOrPorts = [Number(urlsOrPorts)]
+    }
+    if (urlsOrPorts instanceof URL) {
+      urlsOrPorts = [Number(urlsOrPorts.port)]
+    }
+    if (_.isArray(urlsOrPorts)) {
+      urlsOrPorts = (urlsOrPorts as (number | URL)[]).map(portLocalHOst => {
+        if (portLocalHOst instanceof URL) {
+          portLocalHOst = Number(portLocalHOst);
         }
-        if (_.isNumber(urlOrPort)) {
-          urlOrPort = new URL(`http://localhost:${urlOrPort}`);
-        }
-        return (urlOrPort as URL);
-      }) as URL[];
-      urlsOrPorts = _.sortBy(urlsOrPorts, a => Number(a.port))
+        return Number(portLocalHOst)
+      });
+      urlsOrPorts = urlsOrPorts.reduce((a, b, i) => {
+        return _.merge(a, { [i]: Helpers.urlParse(b) })
+      }, {}) as ScenarioParams;
+    }
+    urlsOrPorts = urlsOrPorts as ScenarioParams;
 
-      if (this.isGroup && this.groupSize !== urlsOrPorts.length) {
-        Helpers.error(`Please provide ${this.groupSize} ports for this scenario`, false, true)
-      }
+    const proxyPorts = _
+      .keys(urlsOrPorts)
+      .map(name => { return { name, portOrUrl: Helpers.urlParse(urlsOrPorts[name]) } }) as ScenarioParamReturn[];
 
-      for (let index = 0; index < urlsOrPorts.length; index++) {
-        let urlOrPort = urlsOrPorts[index];
-        Helpers.info(`Starting scenario server on port ${urlOrPort.href}:
-      description: "${this.description}"
-      `)
-        urlOrPort = urlOrPort as URL;
-        const app = express()
-        this.initMidleware(app);
-        this.initRequests(app, Number((urlOrPort as URL).port));
-        const h = new http.Server(app);
-        h.listen(urlOrPort.port, () => {
-          console.log(`Server listening on`
-            + ` port: ${(urlOrPort as URL).port},`
-            + ` hostname: ${(urlOrPort as URL).pathname},
+    const promises = [] as Promise<any>[];
+    for (let index = 0; index < proxyPorts.length; index++) {
+      let urlOrPort = proxyPorts[index];
+      ((promises, proxyURL) => {
+        promises.push(new Promise((resolve, reject) => {
+          const recordedServerName = ((urlOrPort.name && urlOrPort.name.trim() !== '') ? urlOrPort.name : '').trim();
+
+          Helpers.info(`Starting scenario server on port ${proxyURL.port}
+        recorded/assigned server name: ${recordedServerName !== '' ? recordedServerName : '-'}:
+        description: "${this.description}"
+        `);
+
+          const app = express()
+          this.initMidleware(app);
+          this.initRequests(app, recordedServerName);
+          const h = new http.Server(app);
+          h.listen(proxyURL.port, () => {
+            console.log(`Server listening on ${proxyURL.href}
             env: ${app.settings.env}
-            `);
-          resolve(void 0);
-        });
-      }
+              `);
+            resolve(void 0);
+          });
+        }));
+      })(promises, urlOrPort.portOrUrl);
 
-    });
+    }
+    await Promise.all(promises);
+    return proxyPorts;
   }
 
 
-  tapes(port?: number) {
+  tapes(name?: string) {
     const all = glob
-      .sync(`${this.location}/**/${(this.isGroup && _.isNumber(port)) ? (port + '') : ''}*.json5`) as any;
+      .sync(`${this.location}/**/*__${!!name ? name : ''}*.json5`) as any;
     for (let index = 0; index < all.length; index++) {
       const f = all[index];
       all[index] = Tape.from(Helpers.readJson(f, void 0, true));
