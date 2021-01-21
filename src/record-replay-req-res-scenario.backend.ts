@@ -13,6 +13,7 @@ import * as inquirer from 'inquirer';
 import { Models } from 'tnp-models';
 //#endregion
 
+//#region models
 export type RecorderConfigMeta = {
   [recordHostName: string]: { host: number | string | URL; talkbackProxyPort?: number | string; }
 } & { scenarioName: string; }
@@ -47,15 +48,18 @@ interface ScenarioArgType {
    */
   params?: ScenarioParamsReturn | URL[];
 }
+//#endregion
 
-export class RestScenarioRepRec {
+export class RecordReplayReqResScenario {
 
+  //#region consts
   /**
    * by pinging to http://localhost:5544/path/to/something
    * you are actually recording request from
    * by pinging to http://< host for recording >/path/to/something
    */
   readonly DEFAULT_TALKBACK_PROXY_SERVER_PORT = 5544;
+  //#endregion
 
   //#region singleton
   private static _instances = {};
@@ -71,10 +75,10 @@ export class RestScenarioRepRec {
     }
   }
   public static Instance(cwd = process.cwd()) {
-    if (!RestScenarioRepRec._instances[cwd]) {
-      RestScenarioRepRec._instances[cwd] = new RestScenarioRepRec(cwd);
+    if (!RecordReplayReqResScenario._instances[cwd]) {
+      RecordReplayReqResScenario._instances[cwd] = new RecordReplayReqResScenario(cwd);
     }
-    return RestScenarioRepRec._instances[cwd] as RestScenarioRepRec;
+    return RecordReplayReqResScenario._instances[cwd] as RecordReplayReqResScenario;
   }
   //#endregion
 
@@ -91,14 +95,14 @@ export class RestScenarioRepRec {
     if (configMeta) {
       //#region by config
       scenarioName = configMeta.scenarioName;
-      _.keys(configMeta).forEach(name => {
+      _.keys(configMeta).forEach((name, i) => {
         const url = Helpers.urlParse(configMeta[name].host);
         results.push({
           record: {
             name,
             url
           },
-          talkbackProxyPort: Number(configMeta[name].talkbackProxyPort)
+          talkbackProxyPort: Number(configMeta[name].talkbackProxyPort) + i
         })
       })
       //#endregion
@@ -109,28 +113,32 @@ export class RestScenarioRepRec {
         a => Helpers.urlParse(a)
       );
       scenarioName = commandString;
-      let options = Helpers.cliTool.argsFrom<{ port: string; }>(scenarioName);
+      let options = Helpers.cliTool.argsFrom<{ port: string; hostName: string; }>(scenarioName);
+      scenarioName = Helpers.cliTool.cleanCommand(scenarioName, options);
       if (_.isArray(options.port)) {
         talkbackPorts = options.port;
       } else if (!isNaN(Number(options.port))) {
         talkbackPorts = [Number(options.port)];
       }
+      const hostName = _.isString(options.hostName) ? [options.hostName]
+        : (_.isArray(options.hostName) ? options.hostName : [])
 
-      if (talkbackPorts.length === 1) {
-        _.times((resolved.length - talkbackPorts.length), () => talkbackPorts.push(_.first(talkbackPorts)));
-      }
-      if (talkbackPorts.length !== resolved.length) {
+      if (talkbackPorts.length === 0) {
         Helpers.error(`[rec-scenario-rep-rec] Incorrect configuration of ports:
           recordHosts = ${resolved.map(c => Helpers.urlParse(c)).join(', ')}
           talkback ports = ${talkbackPorts.join(', ')}
 
           `, false, true);
       }
+      if (talkbackPorts.length < resolved.length) {
+        const lastN = talkbackPorts[talkbackPorts.length - 1];
+        _.times((resolved.length - talkbackPorts.length), (i) => talkbackPorts.push(lastN + (i + 1)));
+      }
 
       resolved.forEach((recordHost, i) => {
         results.push({
           record: {
-            name: '',
+            name: hostName[i] ? hostName[i] : '',
             url: recordHost
           },
           talkbackProxyPort: talkbackPorts[i]
@@ -165,11 +173,14 @@ export class RestScenarioRepRec {
       description = _.startCase(scenarioName);
     }
     const scenarioNameKebabKase = _.kebabCase(scenarioName);
-    const packageJsonFroScenario = path.join(this.cwd, config.folder.tmpScenarios, scenarioNameKebabKase, config.file.package_json);
     const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
+    const scenarioKebabPath = path.join(scenariosFolder, scenarioNameKebabKase);
+    const packageJsonFroScenario = path.join(scenarioKebabPath, config.file.package_json);
+
     if (!Helpers.exists(scenariosFolder)) {
       Helpers.mkdirp(scenariosFolder);
     }
+    Helpers.removeFolderIfExists(scenarioKebabPath);
     //#endregion
 
     //#region write package.json
@@ -199,8 +210,10 @@ export class RestScenarioRepRec {
 
       Helpers.remove(scenarioPath);
 
+      const talkbackHost = recData.record.url.origin;
+      Helpers.log(`Talkback host: ${talkbackHost}`)
       const server = talkback({
-        host: recData.record.url.host,
+        host: talkbackHost,
         record: RecordMode.OVERWRITE,
         port: recData.talkbackProxyPort,
         path: scenarioPath,
@@ -208,7 +221,7 @@ export class RestScenarioRepRec {
       } as Options);
       server.start(() => {
         Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
-          + `(http://localhost:${recData.talkbackProxyPort})`);
+          + `(http://localhost:${recData.talkbackProxyPort})  => proxy to ${recData.record.url.href}`);
       });
     })
 
@@ -244,8 +257,9 @@ export class RestScenarioRepRec {
   }
   //#endregion
 
+  //#region resolve replay args
   private resolveReplayData(nameOrPathOrDescription: string | string[] | ReplayConfigMeta) {
-    if (_.isObject(nameOrPathOrDescription)) {
+    if (_.isObject(nameOrPathOrDescription) && !_.isArray(nameOrPathOrDescription)) {
       //#region config
       const configMeta = nameOrPathOrDescription as ReplayConfigMeta;
       const scenario = Scenario.From(configMeta.scenarioPath)
@@ -272,9 +286,9 @@ export class RestScenarioRepRec {
       nameOrPathOrDescription = (_.isArray(nameOrPathOrDescription)
         ? nameOrPathOrDescription.join(' ') : nameOrPathOrDescription) as string;
 
-      const args = Helpers.cliTool.argsFrom<{ port: string | string[] }>(nameOrPathOrDescription);
-      nameOrPathOrDescription = Helpers.urlClearOptions<{ port: string | string[] }>(
-        nameOrPathOrDescription, args);
+      const options = Helpers.cliTool.argsFrom<{ port: string | string[]; hostName: string | string[]; }>(nameOrPathOrDescription);
+      nameOrPathOrDescription = Helpers.cliTool.cleanCommand<{ port: string | string[]; hostName: string | string[]; }>(
+        nameOrPathOrDescription, options);
 
       const { resolved, commandString } = Helpers.cliTool
         .argsFromBegin<Scenario>(nameOrPathOrDescription, possiblePathToScenario => {
@@ -291,7 +305,7 @@ export class RestScenarioRepRec {
       nameOrPathOrDescription = commandString;
       let scenarios = resolved;
 
-      if (scenarios.length === 0) {
+      if (scenarios.length === 0 && commandString.trim() !== '') {
         const list = this.allScenarios;
         const { matches, results } = Helpers
           .arrays
@@ -299,14 +313,33 @@ export class RestScenarioRepRec {
         scenarios = scenarios.concat(results);
       }
 
+      let params = portsOrUrlsForReplayServer.map(p => Helpers.urlParse(p));
+      // const hostName = _.isString(options.hostName) ? [options.hostName]
+      //   : (_.isArray(options.hostName) ? options.hostName : []);
+      // if (hostName.length > 0) {
+      //   const newParams = {};
+      //   if (hostName.length > 1 && (hostName.length !== portsOrUrlsForReplayServer.length)) {
+      //     Helpers.error(`Please provide correct number or ports and hostnames
+      //     host names = ${hostName.map(c => Helpers.urlParse(c)).join(', ')}
+      //     talkback ports = ${portsOrUrlsForReplayServer.join(', ')}
+      //     `, false, true);
+      //   }
+      //   hostName.forEach(name => {
+      //     newParams[name] = portsOrUrlsForReplayServer[name];
+      //   });
+      //   params = newParams
+      // }
+      // @LAST
+
       return scenarios.map((scenario) => {
         return {
           scenario,
-          params: portsOrUrlsForReplayServer.map(p => Helpers.urlParse(p))
+          params
         }
       }) as ScenarioArgType[];
     }
   }
+  //#endregion
 
   //#region replay
   async resolveScenariosData(
@@ -320,7 +353,7 @@ export class RestScenarioRepRec {
       if (showListIfNotMatch) {
         const selectedScenario = await this.selectScenario();
         selectedScenario && scenariosArgs.push({
-          params: {},
+          params: [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)],
           scenario: selectedScenario
         });
       }
@@ -331,11 +364,10 @@ export class RestScenarioRepRec {
     }
 
     const tmpScenarioInfo = (s: ScenarioArgType) => {
-      const paramsTmpls = _.keys(s.params).reduce((a, b) => {
+      const paramsTmpls = _.isArray(s.params) ? s.params.map(p => ` replay on ${p}`).join(',') : _.keys(s.params).reduce((a, b) => {
         return `${a}\n\t${chalk.bold(b)}:${s.params[b].href}`
       }, '')
-      return `> ${chalk.bold(s.scenario.basename)}` +
-        `"${s.scenario.description}"` +
+      return `> ${chalk.bold(s.scenario.basename)} "${s.scenario.description}"` +
         paramsTmpls;
     };
 
@@ -348,3 +380,4 @@ export class RestScenarioRepRec {
   //#endregion
 
 }
+

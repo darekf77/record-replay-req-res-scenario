@@ -15,6 +15,7 @@ import { Helpers } from 'tnp-helpers';
 import { config } from 'tnp-config';
 import { URL } from 'url';
 import { Tape } from './tape.backend';
+import { CLASS } from 'typescript-class-helpers';
 
 export type PortOrURL = URL | number;
 export type ScenarioParams = { [nameOfParam: string]: PortOrURL; };
@@ -40,7 +41,14 @@ export class Scenario {
     if (!Scenario.instances[pathToScenario]) {
       Scenario.instances[pathToScenario] = new Scenario(pathToScenario)
     }
-    return Scenario.instances[pathToScenario] as Scenario;
+    const s = Scenario.instances[pathToScenario] as Scenario;
+    if (!s.packageJson) {
+      return void 0;
+    }
+    if (!s.packageJson.tnp || s.packageJson.tnp.type !== 'scenario') {
+      return void 0;
+    }
+    return s;
   }
 
   get basename() {
@@ -104,21 +112,18 @@ export class Scenario {
   }
 
   async start(urlsOrPorts: number | number[] | URL | URL[] | ScenarioParams) {
-    if (_.isString(urlsOrPorts)) {
+    if (_.isString(urlsOrPorts) || _.isNumber(urlsOrPorts)) {
       urlsOrPorts = [Number(urlsOrPorts)]
-    }
-    if (urlsOrPorts instanceof URL) {
-      urlsOrPorts = [Number(urlsOrPorts.port)]
     }
     if (_.isArray(urlsOrPorts)) {
       urlsOrPorts = (urlsOrPorts as (number | URL)[]).map(portLocalHOst => {
         if (portLocalHOst instanceof URL) {
-          portLocalHOst = Number(portLocalHOst);
+          portLocalHOst = Number(portLocalHOst.port);
         }
         return Number(portLocalHOst)
       });
       urlsOrPorts = urlsOrPorts.reduce((a, b, i) => {
-        return _.merge(a, { [i]: Helpers.urlParse(b) })
+        return _.merge(a, { '': Helpers.urlParse(b) })
       }, {}) as ScenarioParams;
     }
     urlsOrPorts = urlsOrPorts as ScenarioParams;
@@ -159,13 +164,24 @@ export class Scenario {
 
 
   tapes(name?: string) {
-    const all = glob
-      .sync(`${this.location}/**/*__${!!name ? name : ''}*.json5`) as any;
-    for (let index = 0; index < all.length; index++) {
-      const f = all[index];
-      all[index] = Tape.from(Helpers.readJson(f, void 0, true));
-    }
-    return all as Tape[];
+    const allTapes = fse
+      .readdirSync(this.location)
+      .filter(f => {
+        const regTmpl = `.*\_\_${(_.isString(name) && name.trim() !== '') ? Helpers.escapeStringForRegEx(_.camelCase(name)) : '[a-zA-Z0-9]+'}$`;
+        const res = (new RegExp(regTmpl)).test(f);
+        return res;
+      })
+      .map(f => path.join(this.location, f))
+      .reduce((pre, folderLocation) => {
+        const patternFiles = `${folderLocation}/**/*.json5`;
+        const all = glob.sync(patternFiles) as any;
+        for (let index = 0; index < all.length; index++) {
+          const f = all[index];
+          all[index] = Tape.from(Helpers.readJson(f, void 0, true));
+        }
+        return pre.concat(all);
+      }, []);
+    return allTapes;
   }
 
 }
