@@ -109,9 +109,10 @@ export class Scenario {
     app.head(/^\/(.*)/, (req, res) => {
       respond(allReq, req, res);
     });
+    return allReq;
   }
 
-  async start(urlsOrPorts: number | number[] | URL | URL[] | ScenarioParams) {
+  async start(urlsOrPorts: number | number[] | URL | URL[] | ScenarioParams, debug = false) {
     if (_.isString(urlsOrPorts) || _.isNumber(urlsOrPorts)) {
       urlsOrPorts = [Number(urlsOrPorts)]
     }
@@ -139,14 +140,20 @@ export class Scenario {
         promises.push(new Promise((resolve, reject) => {
           const recordedServerName = ((urlOrPort.name && urlOrPort.name.trim() !== '') ? urlOrPort.name : '').trim();
 
-          Helpers.info(`Starting scenario server on port ${proxyURL.port}
-        recorded/assigned server name: ${recordedServerName !== '' ? recordedServerName : '-'}:
-        description: "${this.description}"
-        `);
+
 
           const app = express()
           this.initMidleware(app);
-          this.initRequests(app, recordedServerName);
+          const tapes = this.initRequests(app, recordedServerName);
+
+          Helpers.info(`Starting scenario server on port ${proxyURL.port}
+          recorded/assigned server name: ${recordedServerName !== '' ? recordedServerName : '-'}:
+          description: "${this.description}"
+          tapes:\n`
+            + `${!debug ? '' : tapes.map(t => `(${t.req.method}) ${proxyURL.origin}${t.req.url}`).join('\n')}\n`
+            + Helpers.terminalLine()
+          );
+
           const h = new http.Server(app);
           h.listen(proxyURL.port, () => {
             console.log(`Server listening on ${proxyURL.href}
@@ -181,7 +188,7 @@ export class Scenario {
         }
         return pre.concat(all);
       }, []);
-    return allTapes;
+    return allTapes as Tape[];
   }
 
 }
@@ -194,11 +201,11 @@ export interface RequestType {
   }
 }
 
-function respond(allReq, req, res) {
+function respond(allReq: Tape[], req, res) {
 
   const match = allReq.find(s => s.matchToReq(req));
   if (match) {
-    Helpers.log(`MATCH: ${match.req.method} ${match.req.url}`);
+    // Helpers.log(`MATCH: ${match.req.method} ${match.req.url}`);
     _.keys(match.res.headers).forEach(headerKey => {
       const headerString = _.isArray(match.res.headers[headerKey]) ?
         ((match.res.headers[headerKey] || []).join(', ')) :
@@ -207,6 +214,6 @@ function respond(allReq, req, res) {
     })
     res.send(match.res.body); //.status(match.res.status);
   } else {
-    res.send('Dupa NOT MATCH')
+    res.send('REQUEST DOES NOT MATCH ANY RECORDING')
   }
 }

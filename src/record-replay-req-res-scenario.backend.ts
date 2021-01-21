@@ -22,6 +22,8 @@ export type ReplayConfigMeta = {
   [recordHostName: string]: { talkbackProxyPort?: number | string; }
 } & { scenarioPath: string; }
 
+type ReplayRecordArgType = { port: string | string[]; hostName: string | string[]; };
+
 interface RecordArgType {
   record: {
     /**
@@ -41,13 +43,6 @@ interface RecordArgType {
   talkbackProxyPort: number;
 }
 
-interface ScenarioArgType {
-  scenario: Scenario;
-  /**
-   * How to map multiple servers to multiple replay instances
-   */
-  params?: ScenarioParamsReturn | URL[];
-}
 //#endregion
 
 export class RecordReplayReqResScenario {
@@ -258,7 +253,8 @@ export class RecordReplayReqResScenario {
   //#endregion
 
   //#region resolve replay args
-  private resolveReplayData(nameOrPathOrDescription: string | string[] | ReplayConfigMeta) {
+  private async resolveReplayData(nameOrPathOrDescription: string | string[] | ReplayConfigMeta, showListIfNotMatch = false) {
+    const returnValue = { scenarios: [] as Scenario[], params: void 0 as ScenarioParamsReturn }
     if (_.isObject(nameOrPathOrDescription) && !_.isArray(nameOrPathOrDescription)) {
       //#region config
       const configMeta = nameOrPathOrDescription as ReplayConfigMeta;
@@ -267,28 +263,17 @@ export class RecordReplayReqResScenario {
         Helpers.error(`[rest-scenario...] Scenario not found in "${configMeta.scenarioPath}"`
           , false, true)
       }
-      return [{
-        scenario,
-        params: _
-          .keys(configMeta)
-          .filter(key => _.isObject(configMeta[key]))
-          .reduce((prev, curr) => {
-            const v = configMeta[curr];
-            const toMerge: ScenarioParamsReturn = {
-              [curr]: Helpers.urlParse(v.talkbackProxyPort)
-            };
-            return _.merge(prev, toMerge);
-          }, {} as ScenarioParamsReturn)
-      } as ScenarioArgType];
+      returnValue.scenarios = [scenario];
+      returnValue.params = _.pickBy(configMeta, _.isObject) as ScenarioParamsReturn;
       //#endregion
     } else {
-      let portsOrUrlsForReplayServer = [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)] as URL[];
+      //#region from command line
+
       nameOrPathOrDescription = (_.isArray(nameOrPathOrDescription)
         ? nameOrPathOrDescription.join(' ') : nameOrPathOrDescription) as string;
 
-      const options = Helpers.cliTool.argsFrom<{ port: string | string[]; hostName: string | string[]; }>(nameOrPathOrDescription);
-      nameOrPathOrDescription = Helpers.cliTool.cleanCommand<{ port: string | string[]; hostName: string | string[]; }>(
-        nameOrPathOrDescription, options);
+      const options = Helpers.cliTool.argsFrom<ReplayRecordArgType>(nameOrPathOrDescription);
+      nameOrPathOrDescription = Helpers.cliTool.cleanCommand(nameOrPathOrDescription, options);
 
       const { resolved, commandString } = Helpers.cliTool
         .argsFromBegin<Scenario>(nameOrPathOrDescription, possiblePathToScenario => {
@@ -313,31 +298,50 @@ export class RecordReplayReqResScenario {
         scenarios = scenarios.concat(results);
       }
 
-      let params = portsOrUrlsForReplayServer.map(p => Helpers.urlParse(p));
-      // const hostName = _.isString(options.hostName) ? [options.hostName]
-      //   : (_.isArray(options.hostName) ? options.hostName : []);
-      // if (hostName.length > 0) {
-      //   const newParams = {};
-      //   if (hostName.length > 1 && (hostName.length !== portsOrUrlsForReplayServer.length)) {
-      //     Helpers.error(`Please provide correct number or ports and hostnames
-      //     host names = ${hostName.map(c => Helpers.urlParse(c)).join(', ')}
-      //     talkback ports = ${portsOrUrlsForReplayServer.join(', ')}
-      //     `, false, true);
-      //   }
-      //   hostName.forEach(name => {
-      //     newParams[name] = portsOrUrlsForReplayServer[name];
-      //   });
-      //   params = newParams
-      // }
-      // @LAST
+      const hostName = _.isString(options.hostName) ? [options.hostName]
+        : (_.isArray(options.hostName) ? options.hostName : []);
 
-      return scenarios.map((scenario) => {
-        return {
-          scenario,
-          params
+
+      const portsOrUrlsForReplayServer = (_.isString(options.port) ? [Helpers.urlParse(options.port)]
+        : (_.isArray(options.port) ? options.port.map(p => Helpers.urlParse(p))
+          : [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)])).filter(u => u instanceof URL);
+
+      if (portsOrUrlsForReplayServer.length === 0) {
+        Helpers.error(`Please provide correct number or ports and hostnames
+          host names = ${hostName.map(c => Helpers.urlParse(c)).join(', ')}
+          talkback ports = ${portsOrUrlsForReplayServer.join(', ')}
+          `, false, true);
+      }
+
+      let params = portsOrUrlsForReplayServer;
+
+      if (hostName.length > 0) {
+        if (hostName.length > portsOrUrlsForReplayServer.length) {
+          const maxPort = _.maxBy(portsOrUrlsForReplayServer, p => Number(p.port));
+          _.times(hostName.length - portsOrUrlsForReplayServer.length, n => {
+            portsOrUrlsForReplayServer.push(Helpers.urlParse(Number(maxPort.port) + (n + 1)))
+          });
         }
-      }) as ScenarioArgType[];
+        params = hostName.reduce((prev, name, i) => {
+          return _.merge(prev, { [name]: portsOrUrlsForReplayServer[i] })
+        }, {}) as any;
+      }
+
+      returnValue.params = params as any;
+      returnValue.scenarios = scenarios;
+      //#endregion
     }
+
+    //#region select menu scenraios
+    if (returnValue.scenarios.length === 0) {
+      if (showListIfNotMatch) {
+        const selectedScenario = await this.selectScenario();
+        returnValue.scenarios.push(selectedScenario);
+      }
+    }
+    //#endregion
+
+    return returnValue;
   }
   //#endregion
 
@@ -347,35 +351,27 @@ export class RecordReplayReqResScenario {
     showListIfNotMatch = false
   ) {
 
-    const scenariosArgs = this.resolveReplayData(nameOrPathOrDescription);
+    const { scenarios, params } = await this.resolveReplayData(nameOrPathOrDescription, showListIfNotMatch);
 
-    if (scenariosArgs.length === 0) {
-      if (showListIfNotMatch) {
-        const selectedScenario = await this.selectScenario();
-        selectedScenario && scenariosArgs.push({
-          params: [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)],
-          scenario: selectedScenario
-        });
-      }
-    }
-    if (scenariosArgs.length === 0) {
+    if (scenarios.length === 0) {
       Helpers.error(`[record - replay - req - res - scenario]`
         + `Not able to find scenario by name or path "${nameOrPathOrDescription}"`, false, true);
     }
 
-    const tmpScenarioInfo = (s: ScenarioArgType) => {
-      const paramsTmpls = _.isArray(s.params) ? s.params.map(p => ` replay on ${p}`).join(',') : _.keys(s.params).reduce((a, b) => {
-        return `${a}\n\t${chalk.bold(b)}:${s.params[b].href}`
-      }, '')
-      return `> ${chalk.bold(s.scenario.basename)} "${s.scenario.description}"` +
-        paramsTmpls;
-    };
+    // const tmpScenarioInfo = (s: Scenario) => {
+    //   const paramsTmpls = _.isArray(params) ? params.map(p => ` replay on ${p}`).join(',')
+    //     : _.keys(params).reduce((a, b) => {
+    //       return `${a}\n\t${chalk.bold(b)}:${params[b].href}`
+    //     }, '')
+    //   return `> ${chalk.bold(s.basename)} "${s.description}"` +
+    //     paramsTmpls;
+    // };
 
-    Helpers.info(`
-    (${chalk.bold(scenariosArgs.length.toString())}) scenario(s) to replay: ` +
-      `${scenariosArgs.map(s => tmpScenarioInfo(s)).join('\n')}`
-    );
-    return scenariosArgs;
+    // Helpers.info(`
+    // (${chalk.bold(scenarios.length.toString())}) scenario(s) to replay: `
+    //   + `${scenarios.map(s => tmpScenarioInfo(s)).join('\n')}`
+    // );
+    return { scenario: _.first(scenarios), scenarios, params };
   }
   //#endregion
 

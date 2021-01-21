@@ -10,10 +10,10 @@ export async function run(args: string[]) {
     await ins.record(args)
   }
   if (command === 'replay') {
-    const scenarioArgs = await ins.resolveScenariosData(args, true);
-    for (let index = 0; index < scenarioArgs.length; index++) {
-      const s = scenarioArgs[index];
-      await s.scenario.start(s.params);
+    const { scenarios, params } = await ins.resolveScenariosData(args, true);
+    for (let index = 0; index < scenarios.length; index++) {
+      const s = scenarios[index];
+      await s.start(params,true);
     }
     process.stdin.resume();
   }
