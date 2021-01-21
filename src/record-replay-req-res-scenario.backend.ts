@@ -90,16 +90,18 @@ export class RecordReplayReqResScenario {
     if (configMeta) {
       //#region by config
       scenarioName = configMeta.scenarioName;
-      _.keys(configMeta).forEach((name, i) => {
-        const url = Helpers.urlParse(configMeta[name].host);
-        results.push({
-          record: {
-            name,
-            url
-          },
-          talkbackProxyPort: Number(configMeta[name].talkbackProxyPort) + i
+      _.keys(configMeta)
+        .filter(key => _.isObject(configMeta[key]))
+        .forEach((name, i) => {
+          const url = Helpers.urlParse(configMeta[name].host);
+          results.push({
+            record: {
+              name,
+              url
+            },
+            talkbackProxyPort: Number(configMeta[name].talkbackProxyPort) + i
+          })
         })
-      })
       //#endregion
     } else {
       //#region by command line argument
@@ -157,70 +159,71 @@ export class RecordReplayReqResScenario {
    *  rest-scenario-rep-rec record 4444 5555  http://my.api.com   'my super scenario --port 6767 --port 7777 --port 8888'
    *  ins.record( { portOrHost: http://192.129.23.12; name: 'localApiProxy'  }, 'super scenario')
    */
-  async record(serverHostOrPort: string | string[] | RecorderConfigMeta) {
-    const currentDate = new Date();
-    let { args, scenarioName } = this.resolveArgsRecord(serverHostOrPort);
+  async record(serverHostOrPort: string | string[] | RecorderConfigMeta, debug = false) {
+    return new Promise((resolve, reject) => {
+      const currentDate = new Date();
+      let { args, scenarioName } = this.resolveArgsRecord(serverHostOrPort);
 
-    //#region prepare main scenario folder
-    let description = scenarioName;
-    if (!_.isString(scenarioName) || scenarioName.trim() === '') {
-      scenarioName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;;
-      description = _.startCase(scenarioName);
-    }
-    const scenarioNameKebabKase = _.kebabCase(scenarioName);
-    const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
-    const scenarioKebabPath = path.join(scenariosFolder, scenarioNameKebabKase);
-    const packageJsonFroScenario = path.join(scenarioKebabPath, config.file.package_json);
+      //#region prepare main scenario folder
+      let description = scenarioName;
+      if (!_.isString(scenarioName) || scenarioName.trim() === '') {
+        scenarioName = `new-scenario-${_.kebabCase(moment(currentDate).format('MMMM Do YYYY, h:mm:ss a'))}`;;
+        description = _.startCase(scenarioName);
+      }
+      const scenarioNameKebabKase = _.kebabCase(scenarioName);
+      const scenariosFolder = path.join(this.cwd, config.folder.tmpScenarios);
+      const scenarioKebabPath = path.join(scenariosFolder, scenarioNameKebabKase);
+      const packageJsonFroScenario = path.join(scenarioKebabPath, config.file.package_json);
 
-    if (!Helpers.exists(scenariosFolder)) {
-      Helpers.mkdirp(scenariosFolder);
-    }
-    Helpers.removeFolderIfExists(scenarioKebabPath);
-    //#endregion
+      if (!Helpers.exists(scenariosFolder)) {
+        Helpers.mkdirp(scenariosFolder);
+      }
+      Helpers.removeFolderIfExists(scenarioKebabPath);
+      //#endregion
 
-    //#region write package.json
-    Helpers.writeFile(packageJsonFroScenario, {
-      name: scenarioNameKebabKase,
-      description,
-      version: '0.0.0',
-      creationDate: currentDate.toDateString(),
-      scripts: {
-        start: 'firedev serve',
-      },
-      tnp: {
-        type: 'scenario',
-      } as any,
-    } as Partial<Models.npm.IPackageJSON>);
-    //#endregion
+      //#region write package.json
+      Helpers.writeFile(packageJsonFroScenario, {
+        name: scenarioNameKebabKase,
+        description,
+        version: '0.0.0',
+        creationDate: currentDate.toDateString(),
+        scripts: {
+          start: 'firedev serve',
+        },
+        tnp: {
+          type: 'scenario',
+        } as any,
+      } as Partial<Models.npm.IPackageJSON>);
+      //#endregion
 
-    args.forEach(recData => {
-      Helpers.log(`RECORD FROM: ${recData.record.url.href}`)
+      args.forEach(recData => {
+        Helpers.log(`RECORD FROM: ${recData.record.url.href}`)
 
-      const scenarioPath = path.join(
-        this.cwd,
-        config.folder.tmpScenarios,
-        scenarioNameKebabKase,
-        `${(_.kebabCase(recData.record.url.href)).toString()}__${_.camelCase(recData.record.name)}`
-      );
+        const scenarioPath = path.join(
+          this.cwd,
+          config.folder.tmpScenarios,
+          scenarioNameKebabKase,
+          `${(_.kebabCase(recData.record.url.href)).toString()}__${_.camelCase(recData.record.name)}`
+        );
 
-      Helpers.remove(scenarioPath);
+        Helpers.remove(scenarioPath);
 
-      const talkbackHost = recData.record.url.origin;
-      Helpers.log(`Talkback host: ${talkbackHost}`)
-      const server = talkback({
-        host: talkbackHost,
-        record: RecordMode.OVERWRITE,
-        port: recData.talkbackProxyPort,
-        path: scenarioPath,
-        silent: true,
-      } as Options);
-      server.start(() => {
-        Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
-          + `(http://localhost:${recData.talkbackProxyPort})  => proxy to ${recData.record.url.href}`);
-      });
-    })
-
-    process.stdin.resume()
+        const talkbackHost = recData.record.url.origin;
+        debug && Helpers.info(`Talkback host: ${talkbackHost}`)
+        const server = talkback({
+          host: talkbackHost,
+          record: RecordMode.OVERWRITE,
+          port: recData.talkbackProxyPort,
+          path: scenarioPath,
+          silent: true,
+        } as Options);
+        server.start(() => {
+          Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
+            + `(http://localhost:${recData.talkbackProxyPort})  => proxy to ${recData.record.url.href}`);
+          resolve(void 0);
+        });
+      })
+    });
   }
   //#endregion
 
