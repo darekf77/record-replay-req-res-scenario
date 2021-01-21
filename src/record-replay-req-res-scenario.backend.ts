@@ -346,7 +346,7 @@ export class RecordReplayReqResScenario {
   //#endregion
 
   //#region replay
-  async resolveScenariosData(
+  public async resolveScenariosData(
     nameOrPathOrDescription: string | string[] | ReplayConfigMeta,
     showListIfNotMatch = false
   ) {
