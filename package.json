@@ -35,7 +35,7 @@
   "license": "UNLICENSED",
   "main": "index.js",
   "dependencies": {
-    "ng-talkback": "2.4.2",
+    "ng-talkback": "2.4.3",
     "tnp-helpers": "~0.0.12"
   },
   "devDependencies": {

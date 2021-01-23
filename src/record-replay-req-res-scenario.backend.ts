@@ -14,15 +14,17 @@ import { Models } from 'tnp-models';
 //#endregion
 
 //#region models
+export type RecordData = { host: number | string | URL; talkbackProxyPort?: number | string; }
+
 export type RecorderConfigMeta = {
-  [recordHostName: string]: { host: number | string | URL; talkbackProxyPort?: number | string; }
+  [recordHostName: string]: RecordData;
 } & { scenarioName: string; }
 
 export type ReplayConfigMeta = {
   [recordHostName: string]: { talkbackProxyPort?: number | string; }
 } & { scenarioPath: string; }
 
-type ReplayRecordArgType = { port: string | string[]; hostName: string | string[]; };
+type ArgsOptReplayRecordArgType = { port: string | string[]; hostName: string | string[]; };
 
 interface RecordArgType {
   record: {
@@ -148,6 +150,29 @@ export class RecordReplayReqResScenario {
   }
   //#endregion
 
+  //#region command from config
+  public recordAsWorker(config: RecorderConfigMeta, cwd: string = process.cwd()) {
+    const hosts = Object
+      .keys(config)
+      .filter(hostName => _.isObject(config[hostName]))
+      .map(hostName => {
+        const v = config[hostName] as RecordData;
+        return (v.host as URL).origin;
+      });
+    const portName = Object
+      .keys(config)
+      .filter(hostName => _.isObject(config[hostName]))
+      .map(hostName => {
+        const v = config[hostName] as RecordData;
+        return `--port ${v.talkbackProxyPort} --hostName ${hostName}`
+      })
+    let command = `record-replay-req-res-scenario record ${hosts.join(' ')} '${config.scenarioName}' ${portName.join(' ')}`;
+    console.log(command);
+    Helpers.pressKeyAndContinue();
+    // Helpers.run(command, { cwd }).async();
+  }
+  //#endregion
+
   //#region record
   /**
    *  rest-scenario-rep-rec record http://localhost:4444 Recording localhost data
@@ -212,14 +237,16 @@ export class RecordReplayReqResScenario {
         debug && Helpers.info(`Talkback host: ${talkbackHost}`)
         const server = talkback({
           host: talkbackHost,
-          record: RecordMode.OVERWRITE,
+          record: RecordMode.NEW,
           port: recData.talkbackProxyPort,
           path: scenarioPath,
-          silent: true,
+          // silent: true,
+          debug: true
         } as Options);
         server.start(() => {
           Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
-            + `(http://localhost:${recData.talkbackProxyPort})  => proxy to ${recData.record.url.href}`);
+            + `( click for test ${chalk.bold(recData.record?.name ? recData.record.name : '')} `
+            + `http://localhost:${recData.talkbackProxyPort}/ng-talkback-test  )  => proxy to ${recData.record.url.href}`);
           resolve(void 0);
         });
       })
@@ -275,7 +302,7 @@ export class RecordReplayReqResScenario {
       nameOrPathOrDescription = (_.isArray(nameOrPathOrDescription)
         ? nameOrPathOrDescription.join(' ') : nameOrPathOrDescription) as string;
 
-      const options = Helpers.cliTool.argsFrom<ReplayRecordArgType>(nameOrPathOrDescription);
+      const options = Helpers.cliTool.argsFrom<ArgsOptReplayRecordArgType>(nameOrPathOrDescription);
       nameOrPathOrDescription = Helpers.cliTool.cleanCommand(nameOrPathOrDescription, options);
 
       const { resolved, commandString } = Helpers.cliTool
