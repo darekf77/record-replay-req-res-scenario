@@ -167,9 +167,7 @@ export class RecordReplayReqResScenario {
         return `--port ${v.talkbackProxyPort} --hostName ${hostName}`
       })
     let command = `record-replay-req-res-scenario record ${hosts.join(' ')} '${config.scenarioName}' ${portName.join(' ')}`;
-    console.log(command);
-    Helpers.pressKeyAndContinue();
-    // Helpers.run(command, { cwd }).async();
+    Helpers.run(command, { cwd }).async();
   }
   //#endregion
 
@@ -240,8 +238,8 @@ export class RecordReplayReqResScenario {
           record: RecordMode.NEW,
           port: recData.talkbackProxyPort,
           path: scenarioPath,
-          // silent: true,
-          debug: true
+          silent: true,
+          // debug: true
         } as Options);
         server.start(() => {
           Helpers.info(`"Talkback Started" on port ${recData.talkbackProxyPort} `
@@ -264,13 +262,14 @@ export class RecordReplayReqResScenario {
   //#endregion
 
   //#region select scenario
-  async selectScenario(
-    mainMessage = `Select scenario from list:`
-  ): Promise<Scenario> {
+  async selectScenario(goBackButtonOnList?: boolean): Promise<Scenario> {
+    const mainMessage = `Select scenario from list:`;
     const choices = Scenario.allCurrent.map(c => {
       return { name: `"${c.description}"`, value: c }
     });
-
+    if (goBackButtonOnList) {
+      choices.push({ name: '<= Go back', value: void 0 });
+    }
 
     const res = await inquirer.prompt({
       type: 'list',
@@ -283,7 +282,11 @@ export class RecordReplayReqResScenario {
   //#endregion
 
   //#region resolve replay args
-  private async resolveReplayData(nameOrPathOrDescription: string | string[] | ReplayConfigMeta, showListIfNotMatch = false) {
+  private async resolveReplayData(
+    nameOrPathOrDescription: string | string[] | ReplayConfigMeta,
+    showListIfNotMatch = false,
+    goBackButtonOnList = false,
+  ) {
     const returnValue = { scenarios: [] as Scenario[], params: void 0 as ScenarioParamsReturn }
     if (_.isObject(nameOrPathOrDescription) && !_.isArray(nameOrPathOrDescription)) {
       //#region config
@@ -331,7 +334,6 @@ export class RecordReplayReqResScenario {
       const hostName = _.isString(options.hostName) ? [options.hostName]
         : (_.isArray(options.hostName) ? options.hostName : []);
 
-
       const portsOrUrlsForReplayServer = (_.isString(options.port) ? [Helpers.urlParse(options.port)]
         : (_.isArray(options.port) ? options.port.map(p => Helpers.urlParse(p))
           : [Helpers.urlParse(this.DEFAULT_TALKBACK_PROXY_SERVER_PORT)])).filter(u => u instanceof URL);
@@ -365,7 +367,7 @@ export class RecordReplayReqResScenario {
     //#region select menu scenraios
     if (returnValue.scenarios.length === 0) {
       if (showListIfNotMatch) {
-        const selectedScenario = await this.selectScenario();
+        const selectedScenario = await this.selectScenario(goBackButtonOnList);
         returnValue.scenarios.push(selectedScenario);
       }
     }
@@ -378,10 +380,15 @@ export class RecordReplayReqResScenario {
   //#region replay
   public async resolveScenariosData(
     nameOrPathOrDescription: string | string[] | ReplayConfigMeta,
-    showListIfNotMatch = false
+    showListIfNotMatch = false,
+    goBackButtonOnList = false,
   ) {
 
-    const { scenarios, params } = await this.resolveReplayData(nameOrPathOrDescription, showListIfNotMatch);
+    const { scenarios, params } = await this.resolveReplayData(
+      nameOrPathOrDescription,
+      showListIfNotMatch,
+      goBackButtonOnList,
+    );
 
     if (scenarios.length === 0) {
       Helpers.error(`[record - replay - req - res - scenario]`

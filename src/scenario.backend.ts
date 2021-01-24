@@ -51,6 +51,38 @@ export class Scenario {
     return s;
   }
 
+  public static lastFromFolder(pathToFolder: string): Scenario {
+    const currentScenariosFolder = path.join(pathToFolder, config.folder.tmpScenarios);
+    if (!fse.existsSync(currentScenariosFolder)) {
+      return void 0;
+    }
+    const sorted = (_.sortBy(fse
+      .readdirSync(currentScenariosFolder)
+      .map(f => {
+        f = path.join(currentScenariosFolder, f);
+        const scenario = Scenario.From(f)
+        const mtime = fse.lstatSync(path.join(f, config.file.package_json)).mtime;
+        return { mtime, scenario };
+      }), a => a.mtime)
+      .filter(f => !!f.scenario)
+    );
+    return (sorted.length > 0) ? _.first(sorted).scenario : (void 0)
+  }
+
+  get folderHostNames() {
+    const res = fse
+      .readdirSync(this.location)
+      .filter(f => f !== config.file.package_json)
+      .map(f => {
+        const [addressPart, hostName] = f.split('__');
+        return hostName;
+      });
+    return res;
+  }
+  get path() {
+    return this.location;
+  }
+
   get basename() {
     return path.basename(this.location);
   }
@@ -112,6 +144,16 @@ export class Scenario {
     return allReq;
   }
 
+  scenarioAsWorker(params: ScenarioParams, cwd = process.cwd()) {
+    const hostNames = _.keys(params).map(hostName => hostName);
+    const ports = _.keys(params).map(hostName => Helpers.urlParse(params[hostName]).port);
+    const command = `record-replay-req-res-scenario replay ${this.location} `
+      + `${hostNames.map(h => `--hostName ${h}`).join(' ')} `
+      + `${ports.map(h => `--port ${h}`).join(' ')} `
+      ;
+    Helpers.run(command, { cwd }).async();
+  }
+
   async start(urlsOrPorts: number | number[] | URL | URL[] | ScenarioParams, debug = false) {
     if (_.isString(urlsOrPorts) || _.isNumber(urlsOrPorts)) {
       urlsOrPorts = [Number(urlsOrPorts)]
@@ -147,10 +189,11 @@ export class Scenario {
           const tapes = this.initRequests(app, recordedServerName);
 
           Helpers.info(`Starting scenario server on port ${proxyURL.port}
-          recorded/assigned server name: ${recordedServerName !== '' ? recordedServerName : '-'}:
-          description: "${this.description}"
-          tapes:\n`
-            + `${!debug ? '' : tapes.map(t => `(${t.req.method}) ${proxyURL.origin}${t.req.url}`).join('\n')}\n`
+          Recorded/assigned server name: ${recordedServerName !== '' ? recordedServerName : '-'}:
+          Description: "${this.description}"
+          `
+            + `${!debug ? '' : (tapes.length === 0) ? 'Tapes: < nothing for this server name >' :
+              ('Tapes:\n' + tapes.map(t => `(${t.req.method}) ${proxyURL.origin}${t.req.url}`).join('\n'))}\n`
             + Helpers.terminalLine()
           );
 
