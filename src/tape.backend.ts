@@ -23,11 +23,11 @@ export class Tape implements Partial<BaseTape> {
   }
 
 
-  readonly req: import('ng-talkback/types').Req;
-  readonly res?: import('ng-talkback/types').Res;
-  readonly options: import('ng-talkback/options').Options;
+  readonly req: any; // import('ng-talkback/types').Req;
+  readonly res?: any; //import('ng-talkback/types').Res;
+  readonly options: any; //import('ng-talkback/options').Options;
   readonly queryParamsToIgnore: string[];
-  readonly meta: import('ng-talkback/types').Metadata;
+  readonly meta: any; // import('ng-talkback/types').Metadata;
   readonly path?: string;
   readonly new: boolean;
   readonly used: boolean;
