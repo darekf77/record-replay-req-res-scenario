@@ -222,7 +222,7 @@
     "ps-node": "^0.1.6",
     "q": "^1.5.1",
     "randomcolor": "^0.5.3",
-    "record-replay-req-res-scenario": "~0.0.8",
+    "record-replay-req-res-scenario": "~0.0.9",
     "redbird": "^0.7.0",
     "reflect-metadata": "^0.1.10",
     "rimraf": "^2.6.2",
@@ -272,5 +272,5 @@
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug"
   },
-  "lastBuildTagHash": "445a72ea980c6c80473a62a74df038c057a6aa36"
+  "lastBuildTagHash": "8a4e88a3051243cf8a304d17e028d6f4e8f27bd0"
 }
