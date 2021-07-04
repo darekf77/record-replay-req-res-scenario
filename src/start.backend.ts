@@ -1,5 +1,5 @@
 import { URL } from 'url';
-import { RecordReplayReqResScenario } from './record-replay-req-res-scenario.backend';
+import { RecordReplayReqResScenario } from './record-replay-req-res-scenario';
 import { Helpers } from 'tnp-helpers';
 
 export async function run(args: string[]) {

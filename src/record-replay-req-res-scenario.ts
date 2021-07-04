@@ -1,4 +1,5 @@
 //#region imports
+//#region @backend
 import * as _ from 'lodash';
 import * as path from 'path';
 import { Helpers, Project } from 'tnp-helpers';
@@ -11,6 +12,7 @@ import { Scenario, ScenarioParam, ScenarioParams, ScenarioParamsReturn } from '.
 import chalk from 'chalk';
 import * as inquirer from 'inquirer';
 import { Models } from 'tnp-models';
+//#endregion
 //#endregion
 
 //#region models
@@ -48,6 +50,7 @@ interface RecordArgType {
 //#endregion
 
 export class RecordReplayReqResScenario {
+  //#region @backend
 
   //#region consts
   /**
@@ -412,5 +415,6 @@ export class RecordReplayReqResScenario {
   }
   //#endregion
 
+  //#endregion
 }
 

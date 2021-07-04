@@ -1,6 +1,5 @@
+//#region @notForNpm
 import { Morphi } from 'morphi'
-
-
 
 export async function start() {
 
@@ -9,3 +8,4 @@ export async function start() {
 }
 
 export default start;
+//#endregion
