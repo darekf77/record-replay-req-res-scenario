@@ -31,12 +31,12 @@
     "main": "index.js"
   },
   "name": "record-replay-req-res-scenario",
-  "version": "0.0.15",
-  "license": "UNLICENSED",
+  "version": "0.0.16",
+  "license": "MIT",
   "main": "index.js",
   "dependencies": {
     "ng-talkback": "~2.4.14",
-    "tnp-helpers": "~0.0.34"
+    "tnp-helpers": "~0.0.35"
   },
   "devDependencies": {
     "@angular-devkit/build-angular": "0.901.3",
