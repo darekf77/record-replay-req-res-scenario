@@ -267,5 +267,8 @@
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug"
   },
-  "lastBuildTagHash": "f54eade7578aef867f2d0356eba68ea3d447f37d"
+  "lastBuildTagHash": "f54eade7578aef867f2d0356eba68ea3d447f37d",
+  "recreatedFrom": {
+    "tnp.json": true
+  }
 }
