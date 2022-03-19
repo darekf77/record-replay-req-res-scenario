@@ -1,7 +1,7 @@
 {
   "name": "record-replay-req-res-scenario",
   "version": "13.0.6",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "main": "index.js",
   "dependencies": {
     "ng-talkback": "~13.0.5",
@@ -12,5 +12,6 @@
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug"
   },
-  "lastBuildTagHash": "f54eade7578aef867f2d0356eba68ea3d447f37d"
+  "lastBuildTagHash": "f54eade7578aef867f2d0356eba68ea3d447f37d",
+  "devDependencies": {}
 }
