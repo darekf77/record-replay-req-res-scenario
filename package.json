@@ -1,7 +1,7 @@
 {
   "name": "record-replay-req-res-scenario",
   "version": "13.0.13",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "main": "index.js",
   "dependencies": {
     "ng-talkback": "~13.0.12",
