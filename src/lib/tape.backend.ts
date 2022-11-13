@@ -1,7 +1,6 @@
 import * as _ from 'lodash';
 import * as express from 'express';
 import { Tape as BaseTape } from 'ng-talkback';
-import json5 from 'json5';
 
 export class Tape implements Partial<BaseTape> {
 

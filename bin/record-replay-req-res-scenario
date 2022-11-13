@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 var { fse, crossPlatformPath, path } = require('tnp-core');
 var path = {
-  dist: path.join(crossPlatformPath(__dirname), '../dist/start.backend.js'),
+  dist: path.join(crossPlatformPath(__dirname), '../dist/lib/start.backend.js'),
   bundle: path.join(crossPlatformPath(__dirname), '../start.backend.js')
 }
 var p = fse.existsSync(path.dist) ? path.dist : path.bundle;

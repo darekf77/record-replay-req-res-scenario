@@ -1,4 +1,4 @@
-#!/usr/bin/env node --inspect
+#!/usr/bin/env node --inspect-brk
 var { fse, crossPlatformPath, path } = require('tnp-core');
 var path = {
   dist: path.join(crossPlatformPath(__dirname), '../dist/lib/start.backend.js'),

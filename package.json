@@ -10,7 +10,8 @@
   "private": false,
   "bin": {
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
-    "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug"
+    "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug",
+    "record-replay-req-res-scenario-debug-brk": "bin/record-replay-req-res-scenario-debug-brk"
   },
   "lastBuildTagHash": "d637fe943d9cfbb5b422789a089d4d0f6d4b9d78",
   "devDependencies": {
