@@ -6,12 +6,15 @@
   "overrided": {
     "ignoreDepsPattern": [],
     "includeAsDev": [],
+
     "includeOnly": [
       "ng-talkback",
       "tnp-helpers"
     ],
+
     "dependencies": {},
-    "linkedFolders": []
+    "linkedFolders": [],
+    'npmFixes': [],
   },
 
   "linkedProjects": [],
