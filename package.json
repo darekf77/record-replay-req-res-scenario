@@ -1,8 +1,44 @@
 {
+  "tnp": {
+    "resources": [
+      "README.md"
+    ],
+    "overrided": {
+      "ignoreDepsPattern": [],
+      "includeAsDev": [],
+      "includeOnly": [
+        "ng-talkback",
+        "tnp-helpers"
+      ],
+      "dependencies": {},
+      "linkedFolders": [],
+      "npmFixes": []
+    },
+    "linkedProjects": [],
+    "smartContainerBuildTarget": "",
+    "linkedRepos": [],
+    "libReleaseOptions": {
+      "nodts": false,
+      "obscure": false,
+      "ugly": false,
+      "includeNodeModules": false
+    },
+    "smartContainerTarget": "",
+    "type": "isomorphic-lib",
+    "isCoreProject": false,
+    "useFramework": false,
+    "required": [],
+    "version": "v3",
+    "isGenerated": false,
+    "requiredServers": [],
+    "license": "UNLICENSED",
+    "private": false,
+    "main": "index.js",
+    "workerPlugins": {}
+  },
   "name": "record-replay-req-res-scenario",
   "version": "13.1.20",
   "license": "UNLICENSED",
-  "main": "index.js",
   "dependencies": {
     "ng-talkback": "~13.1.19",
     "tnp-helpers": "~13.1.7"
