@@ -49,7 +49,7 @@
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug",
     "record-replay-req-res-scenario-debug-brk": "bin/record-replay-req-res-scenario-debug-brk"
   },
-  "lastBuildTagHash": "d1af66f8afcecc9f1b532112715b068e149204c4",
+  "lastBuildTagHash": "c51a6417bc685f242b2b91f51da472ed547a8af1",
   "devDependencies": {
     "@angular-devkit/build-angular": "~16.0.5",
     "@angular-devkit/core": "~16.0.5",
@@ -260,7 +260,7 @@
     "ps-node": "0.1.6",
     "q": "1.5.1",
     "randomcolor": "0.5.3",
-    "record-replay-req-res-scenario": "~13.1.20",
+    "record-replay-req-res-scenario": "~16.0.1",
     "reflect-metadata": "0.1.10",
     "rimraf": "2.6.2",
     "rxjs": "~7.8.0",
