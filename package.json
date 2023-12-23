@@ -49,7 +49,7 @@
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug",
     "record-replay-req-res-scenario-debug-brk": "bin/record-replay-req-res-scenario-debug-brk"
   },
-  "lastBuildTagHash": "e34ce22c35943b19c48e8b08df100ac5290f3632",
+  "lastBuildTagHash": "1bfe8d375484051edac638abf5e81074ecd5b073",
   "devDependencies": {
     "@angular-devkit/build-angular": "~16.0.5",
     "@angular-devkit/core": "~16.0.5",
@@ -283,7 +283,7 @@
     "q": "1.5.1",
     "rallax.js": "2.0.4",
     "randomcolor": "0.5.3",
-    "record-replay-req-res-scenario": "~16.5.2",
+    "record-replay-req-res-scenario": "~16.5.3",
     "reflect-metadata": "0.1.10",
     "rimraf": "2.6.2",
     "rxjs": "~7.8.0",
