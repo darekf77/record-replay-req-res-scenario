@@ -37,7 +37,7 @@
     "workerPlugins": {}
   },
   "name": "record-replay-req-res-scenario",
-  "version": "16.5.13",
+  "version": "16.5.14",
   "license": "UNLICENSED",
   "dependencies": {
     "ng-talkback": "~16.5.14",

@@ -2,7 +2,7 @@
 //#region @backend
 import * as _ from 'lodash';
 import * as path from 'path';
-import { Helpers, Project } from 'tnp-helpers';
+import { Helpers, BaseProject as Project } from 'tnp-helpers';
 import { URL } from 'url';
 import { config } from 'tnp-config';
 import * as moment from 'moment';
@@ -258,7 +258,7 @@ export class RecordReplayReqResScenario {
   //#region all scenaroios
   public get allScenarios() {
     return glob.sync(`${path.join(this.cwd, config.folder.tmpScenarios)}/*`)
-      .filter(f => !!Project.From(f))
+      .filter(f => !!Project.ins.From(f))
       .map(f => Scenario.From(f))
       .filter(f => !!f)
   }
