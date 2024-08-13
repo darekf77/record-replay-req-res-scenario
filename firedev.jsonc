@@ -1,20 +1,13 @@
 {
-  "resources": [
-    "README.md"
-  ],
+  "resources": ["README.md"],
 
   "overrided": {
     "ignoreDepsPattern": [],
     "includeAsDev": [],
-
-    "includeOnly": [
-      "ng-talkback",
-      "tnp-helpers"
-    ],
-
+    "includeOnly": ["ng-talkback", "tnp-helpers"],
     "dependencies": {},
     "linkedFolders": [],
-    "npmFixes": [],
+    "npmFixes": []
   },
 
   "smartContainerBuildTarget": "",
@@ -28,7 +21,7 @@
     "cliBuildNoDts": false,
     "cliBuildObscure": false,
     "cliBuildIncludeNodeModules": false,
-    "cliBuildUglify": false,
+    "cliBuildUglify": false
   },
 
   "smartContainerTarget": "",
@@ -36,11 +29,11 @@
   "isCoreProject": false,
   "useFramework": false,
   "required": [],
-  "version": "v16",
+  "version": "v18",
   "isGenerated": false,
   "requiredServers": [],
   "license": "UNLICENSED",
   "private": false,
   "main": "index.js",
-  "workerPlugins": {},
+  "workerPlugins": {}
 }
