@@ -40,7 +40,7 @@
     "workerPlugins": {}
   },
   "name": "record-replay-req-res-scenario",
-  "version": "18.0.6",
+  "version": "18.0.7",
   "license": "UNLICENSED",
   "dependencies": {
     "ng-talkback": "~18.0.5",
