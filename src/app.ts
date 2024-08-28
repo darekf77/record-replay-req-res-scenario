@@ -1,5 +1,5 @@
 //#region @notForNpm
-import { Morphi } from 'morphi'
+import { Taon } from 'taon'
 
 export async function start() {
 
