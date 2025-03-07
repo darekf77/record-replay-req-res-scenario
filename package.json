@@ -37,7 +37,8 @@
     "license": "UNLICENSED",
     "private": false,
     "main": "index.js",
-    "workerPlugins": {}
+    "workerPlugins": {},
+    "packageJsonOverride": {}
   },
   "name": "record-replay-req-res-scenario",
   "version": "18.0.19",
