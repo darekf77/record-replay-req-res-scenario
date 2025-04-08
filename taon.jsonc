@@ -1,39 +1,17 @@
 {
+  "type": "isomorphic-lib",
+  "version": "v18",
+  "dependenciesNamesForNpmLib": ["ng-talkback", "tnp-helpers"],
+
+  "autoReleaseConfigAllowedItems": [{
+    "artifactName": "npm-lib-and-cli-tool"
+  }],
+
+  "isCoreProject": false,
   "resources": ["README.md"],
 
-  "overrided": {
-    "ignoreDepsPattern": [],
-    "includeAsDev": [],
-    "includeOnly": ["ng-talkback", "tnp-helpers"],
-    "dependencies": {},
-    "linkedFolders": [],
-    "npmFixes": []
-  },
-
-  "smartContainerBuildTarget": "",
-  "linkedRepos": [],
-
-  "libReleaseOptions": {
-    "nodts": false,
-    "obscure": false,
-    "ugly": false,
-    "includeNodeModules": false,
-    "cliBuildNoDts": false,
-    "cliBuildObscure": false,
-    "cliBuildIncludeNodeModules": false,
-    "cliBuildUglify": false
-  },
-
-  "smartContainerTarget": "",
-  "type": "isomorphic-lib",
-  "isCoreProject": false,
-  "useFramework": false,
-  "required": [],
-  "version": "v18",
-  "isGenerated": false,
-  "requiredServers": [],
-  "license": "UNLICENSED",
-  "private": false,
-  "main": "index.js",
-  "workerPlugins": {}
+  "packageJsonOverride": {
+    "license": "UNLICENSED",
+    "private": false
+  }
 }
