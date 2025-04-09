@@ -11,6 +11,7 @@
   "resources": ["README.md"],
 
   "packageJsonOverride": {
+    "author": "Dariusz Filipiak",
     "license": "UNLICENSED",
     "private": false
   }

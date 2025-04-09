@@ -4,15 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strictNullChecks": false,
-    "rootDir": "./src",
-    "paths": {
-      "record-replay-req-res-scenario": [
-        "./src/lib"
-      ],
-      "record-replay-req-res-scenario/*": [
-        "./src/lib/*"
-      ]
-    }
+    "rootDir": "./src"
   },
   "include": [
     "src/**/*"
