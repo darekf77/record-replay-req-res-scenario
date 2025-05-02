@@ -4,10 +4,16 @@
     "strictNullChecks": false,
     "rootDir": "./src",
     "paths": {
-      "record-replay-req-res-scenario": [
+      "@lib": [
         "./src/lib"
       ],
-      "record-replay-req-res-scenario/*": [
+      "@lib/*": [
+        "./src/lib/*"
+      ],
+      "record-replay-req-res-scenario/src": [
+        "./src/lib"
+      ],
+      "record-replay-req-res-scenario/src/*": [
         "./src/lib/*"
       ]
     }
