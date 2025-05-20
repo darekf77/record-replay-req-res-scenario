@@ -1,6 +1,6 @@
 {
   "name": "record-replay-req-res-scenario",
-  "version": "19.0.13",
+  "version": "19.0.14",
   "license": "UNLICENSED",
   "author": "Dariusz Filipiak",
   "private": false,
@@ -326,6 +326,7 @@
     "yup": "~1.0.0-beta.8",
     "zone.js": "~0.13.0"
   },
+  "main": "dist/app.electron.js",
   "bin": {
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug",
