@@ -1,6 +1,6 @@
 {
   "name": "record-replay-req-res-scenario",
-  "version": "19.0.20",
+  "version": "19.0.21",
   "scripts": {
     "taon init": "taon init",
     "taon start": "taon start",
@@ -351,10 +351,5 @@
     "record-replay-req-res-scenario": "bin/record-replay-req-res-scenario",
     "record-replay-req-res-scenario-debug": "bin/record-replay-req-res-scenario-debug",
     "record-replay-req-res-scenario-debug-brk": "bin/record-replay-req-res-scenario-debug-brk"
-  },
-  "exports": {
-    ".": {
-      "style": "./scss/index.scss"
-    }
   }
 }
