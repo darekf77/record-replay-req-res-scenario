@@ -13,9 +13,9 @@
 
   "packageJsonOverride": {
     "author": "Dariusz Filipiak",
+    "description": "Description for record-replay-req-res-scenario. Hello world!",
     "license": "UNLICENSED",
     "private": false,
-    "scripts": {},
-    "description": "Description for record-replay-req-res-scenario. Hello world!"
+    "scripts": {}
   }
 }
