@@ -1,5 +1,5 @@
 //#region @notForNpm
-import { Taon } from 'taon';
+import { Taon } from 'taon/src';
 
 export async function start() {
   console.log('hello');
