@@ -4,7 +4,7 @@
 // import * as path from 'path';
 // import { Helpers, BaseProject as Project } from 'tnp-helpers';
 // import { URL } from 'url';
-// import { config } from 'tnp-config';
+// import { config } from 'tnp-core';
 // import * as moment from 'moment';
 // import { talkback, Options, RecordMode } from 'ng-talkback';
 // import * as glob from 'glob';

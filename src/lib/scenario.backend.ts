@@ -12,7 +12,7 @@
 // import * as fileUpload from 'express-fileupload';
 // import { Models } from 'tnp-models';
 // import { Helpers } from 'tnp-helpers';
-// import { config } from 'tnp-config';
+// import { config } from 'tnp-core';
 // import { URL } from 'url';
 // import { Tape } from './tape.backend';
 // import { CLASS } from 'typescript-class-helpers';
