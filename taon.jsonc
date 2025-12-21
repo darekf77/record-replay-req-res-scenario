@@ -1,6 +1,6 @@
 {
   "type": "isomorphic-lib",
-  "version": "v19",
+  "version": "v21",
   "dependenciesNamesForNpmLib": ["ng-talkback", "tnp-helpers"],
   "appId": "com.domain.example.record-replay-req-res-scenario",
 
