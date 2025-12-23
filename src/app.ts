@@ -1,3 +1,4 @@
+// @ts-nocheck
 //#region @notForNpm
 import { Taon } from 'taon/src';
 
