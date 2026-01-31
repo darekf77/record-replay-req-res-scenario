@@ -1,6 +1,6 @@
 {
   "name": "record-replay-req-res-scenario",
-  "version": "21.0.17",
+  "version": "21.0.18",
   "scripts": {
     "taon init": "taon init",
     "taon start": "taon start",
