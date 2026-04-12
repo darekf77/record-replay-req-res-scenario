@@ -150,7 +150,7 @@
   "editor.inlineSuggest.enabled": true,
   "prettier.endOfLine": "auto",
   "prettier.prettierPath": "./node_modules/prettier",
-  "window.title": "npm/taon-dev/record-replay-req-res-scenario  [ ${activeEditorShort} ]",
+  "window.title": "taon-dev/record-replay-req-res-scenario () [ ${activeEditorShort}]",
   "search.useIgnoreFiles": false,
 
   "search.include": [
