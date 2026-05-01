@@ -1,15 +1,17 @@
 {
   "type": "isomorphic-lib",
   "version": "v21",
-  "dependenciesNamesForNpmLib": ["ng-talkback", "tnp-helpers"],
   "appId": "com.domain.example.record-replay-req-res-scenario",
-
-  "autoReleaseConfigAllowedItems": [{
-    "artifactName": "npm-lib-and-cli-tool",
-    "taskName": "npm"
-  }],
+  "autoReleaseConfigAllowedItems": [
+    {
+      "artifactName": "npm-lib-and-cli-tool",
+      "taskName": "npm",
+    },
+  ],
 
   "isCoreProject": false,
+
+  "isomorphicDependenciesForNpmLib": ["ng-talkback", "tnp-helpers"],
   "resources": ["README.md"],
 
   "packageJsonOverride": {
@@ -17,6 +19,6 @@
     "description": "Description for record-replay-req-res-scenario. Hello world!",
     "license": "UNLICENSED",
     "private": false,
-    "scripts": {}
-  }
+    "scripts": {},
+  },
 }
