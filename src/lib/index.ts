@@ -6,5 +6,5 @@
 
 
 export function asdaaaaa() {
-  console.log('aa')
+  console.log('23')
 }
