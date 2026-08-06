@@ -1,6 +1,6 @@
 {
   "name": "record-replay-req-res-scenario",
-  "version": "21.0.37",
+  "version": "21.0.38",
   "scripts": {
     "taon init": "taon init",
     "taon start": "taon start",
@@ -258,6 +258,7 @@
     "express-rate-limit": "~8.1.0",
     "express-session": "~1.18.2",
     "fast-glob": "~3.3.2",
+    "fast-xml-parser": "~5.10.1",
     "favicons": "~7.2.0",
     "file-loader": "~1.1.11",
     "file-saver": "2.0.5",
